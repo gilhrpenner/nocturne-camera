@@ -41,7 +41,7 @@ components:
 
 ## Overview
 
-An English-language, single-window macOS tool for Gil's work Halloween party. The user requested a theatrical vampire, person isolation without a green screen, a distant castle, intermittent lightning, flying bats, and keyboard cues. The product's job is to preview and send that scene to Teams with minimal setup.
+An English-language, single-window macOS tool for Gil's work Halloween party. The user requested a theatrical vampire, person isolation without a green screen, a distant castle, frequent varied lightning, flying bats, vampire attire, stronger makeup with blood trails, and keyboard cues. The product's job is to preview and send that scene to Teams with minimal setup.
 
 The reference is a moonlit gothic stage viewed from its quiet control booth. The scene owns the drama; controls stay familiar and legible. Avoid streaming-studio complexity and decorative dashboard cards.
 
@@ -75,7 +75,7 @@ Start camera explicitly requests camera access. No microphone access. Permission
 
 Buttons retain native keyboard, hover, pressed, and disabled states. Global Control–Option shortcuts use Carbon registration, not keyboard monitoring. Every shortcut has an on-screen alternative. Normal camera bypasses all effects, and cue buttons are disabled while bypassed.
 
-System reduced-motion preference disables automatic bats/lightning initially; explicit cue buttons remain intentional user actions. A plain wall and even face lighting are recommended for segmentation quality. Person cutout failure displays the castle rather than leaking the room.
+A Distance slider below the preview controls subject scale with Original/Farther labels, a size percentage, and Reset. It is disabled when the castle cutout is off or normal camera is on. Blood trails and vampire attire have separate switches. The costume is a textured photographic garment overlay with a swept black collar, restrained red piping, and smoothed tracking. System reduced-motion preference freezes blood trails and disables automatic bats/lightning initially; explicit cue buttons remain intentional user actions. A plain wall and even face lighting are recommended for segmentation quality. Person cutout failure displays the castle rather than leaking the room.
 
 ## Do's and Don'ts
 

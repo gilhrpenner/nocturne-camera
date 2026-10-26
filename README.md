@@ -42,11 +42,15 @@ All shortcuts are **Control–Option**, and work while Teams has focus. They use
 | V | Toggle vampire makeup |
 | N | Toggle normal, unfiltered camera |
 
-Theatrical makeup uses pale face grading, dark eye sockets, crimson eyes, and long curved fangs at the upper canines. The fangs protrude below the lips and stay visible with a closed mouth; their placement and angle follow the full mouth contour. It follows the largest detected face. This is a lightweight face-landmark effect, not a generative identity transformation. Profiles, glasses, occlusion, and very dim lighting can reduce tracking quality.
+Theatrical makeup uses pale face grading, sunken eye sockets, subtle branching veins and softly shaded cheek hollows, crimson eyes, burgundy lips, and long curved fangs at the upper canines. The **Blood trails** toggle adds subtle, asymmetric animated blood at the mouth corners. The fangs protrude below the lips and stay visible with a closed mouth; their placement and angle follow the full mouth contour. It follows the largest detected face. This is a lightweight face-landmark effect, not a generative identity transformation. Profiles, glasses, occlusion, and very dim lighting can reduce tracking quality.
+
+The **Distance** slider below the preview scales you, your makeup, and your costume together from 100% down to 55% size. Move it toward **Farther** to reveal more of the generated outfit; **Reset** restores the original framing. It requires Castle & person cutout and is bypassed by Normal camera. It cannot recover real body parts outside the camera frame. With attire off, the cutout stays anchored to the bottom to avoid a floating crop edge.
 
 Person segmentation replaces the room with the castle. No green screen is needed. Even lighting and a plain wall help hair and shoulder edges. If segmentation fails, the app displays the castle and an error status rather than exposing the room. **Normal camera** deliberately shows the original room and bypasses all effects.
 
-Automatic lightning runs roughly every 8.5 seconds and can be switched off. System Reduce Motion initially disables automatic lightning and ambient bats; manual cues remain available.
+**Vampire attire** uses a generated photographic costume texture: black brocade, satin lapels, a swept collar, black silk cravat, ruby clasps, and thin crimson trim. Its position and scale are smoothed using face and shoulder tracking. The cape sits behind the person; its front replaces the shirt while preserving the detected jaw/head silhouette. This is a 2D garment overlay: it cannot reconstruct arms, handle extreme turns, or deform like a 3D costume. The asset is `Resources/vampire-attire.png`; its built-in image-generation prompt is recorded in `Resources/asset-prompts.json`.
+
+Automatic lightning clusters run roughly every 3.2 seconds with varied positions, branching shapes, brightness, and width. The manual lightning cue triggers three staggered bolts. Automatic lightning can be switched off. System Reduce Motion initially disables automatic lightning and ambient bats and freezes blood animation; manual cues remain available.
 
 ## Remove after the party
 
@@ -63,10 +67,10 @@ Requires Xcode, macOS 14+, and an Apple Developer team capable of provisioning a
 
 The build script generates the Xcode project, allows Xcode to create/update provisioning profiles and register the build Mac if necessary, builds a locally installable development-signed app, verifies its signatures and the camera's App Group/Mach service contract, and creates `dist/Nocturne-macOS.zip`. Signing uses the macOS keychain/Xcode account. This is **not a notarized public release**; broader distribution needs Developer ID signing, suitable provisioning, and notarization.
 
-The compositor tests run without opening the webcam. They check dimensions, lightning/fade, bats, vanish timing, normal-camera pixel preservation, empty-input cutout behavior, and sample timing. Real-person tracking and a Teams call require an interactive camera test.
+The compositor tests run without opening the webcam. They check dimensions, lightning/fade, bats, vanish timing, normal-camera pixel preservation, empty-input cutout behavior, sample timing, storm variation and stable fading geometry, costume anchoring, and blood toggling/animation/reduced motion. Real-person tracking and a Teams call require an interactive camera test.
 
 ## Privacy and architecture
 
-Frames stay on the Mac. The host sends BGRA sample buffers into the camera extension's sink stream; the extension exposes its source stream to Teams. There are no network calls or frame files. The generated artwork is the only image asset on disk. No microphone entitlement is requested.
+Frames stay on the Mac. The host sends BGRA sample buffers into the camera extension's sink stream; the extension exposes its source stream to Teams. There are no network calls or frame files. The generated castle and costume artwork are the only bundled image assets. No microphone entitlement is requested.
 
 The project uses Apple's camera-extension APIs and local Vision person/face detection. The castle image was generated for this project. All application source is in this repository; no third-party runtime packages are used.

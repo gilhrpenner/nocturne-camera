@@ -12,6 +12,19 @@ struct RendererTests {
         let scene = try renderer.render(input: nil, options: options, time: 100)
         precondition(CVPixelBufferGetWidth(scene) == 1280 && CVPixelBufferGetHeight(scene) == 720)
         let dark = bytes(scene)
+        options.distance = 1
+        let distantBackground = bytes(try renderer.render(input: nil, options: options, time: 100))
+        precondition(distantBackground == dark, "Distance must not zoom the castle")
+        let far = SceneRenderer.subjectTransform(options: options, bounds: renderer.bounds)
+        let nearPoint = CGPoint(x: 640, y: 500).applying(far)
+        precondition(abs(far.a - 0.55) < 0.0001 && nearPoint.y > 500, "Distance must shrink the person and reveal more attire below")
+        precondition(nearPoint.x == 640, "Distance must preserve horizontal center")
+        options.costume = false
+        let withoutAttire = SceneRenderer.subjectTransform(options: options, bounds: renderer.bounds)
+        precondition(CGPoint(x: 640, y: 0).applying(withoutAttire).y == 0, "A real cropped torso must stay at the bottom edge")
+        options.castle = false
+        precondition(SceneRenderer.subjectTransform(options: options, bounds: renderer.bounds).isIdentity, "Distance needs the castle cutout")
+        options.castle = true; options.costume = true; options.distance = 0
         options.lightningAt = 100
         let lit = bytes(try renderer.render(input: nil, options: options, time: 100))
         precondition(brightness(lit) > brightness(dark) * 1.4, "Lightning must illuminate the background")
@@ -23,6 +36,7 @@ struct RendererTests {
         options.vanishAt = 105
         precondition(options.isVanished(at: 106) && !options.isVanished(at: 108), "Vanish must expire after 3 seconds")
         options.normal = true
+        options.distance = 1
         precondition(options.flash(at: 100) == 0 && !options.isVanished(at: 106), "Normal mode must suppress effects")
         var input: CVPixelBuffer?
         CVPixelBufferCreate(nil, 1280, 720, kCVPixelFormatType_32BGRA,
@@ -40,7 +54,7 @@ struct RendererTests {
         let sample = VideoFormat.sample(scene)!
         precondition(CMSampleBufferIsValid(sample))
         precondition(CMSampleBufferGetPresentationTimeStamp(sample).seconds > 0)
-        print("PASS: 720p output, lightning/fade, bat cue, vanish expiry, normal bypass, cutout isolation, sample timing")
+        print("PASS: 720p output, lightning/fade, bat cue, vanish expiry, distance placement/background preservation, normal bypass, cutout isolation, sample timing")
     }
 
     static func bytes(_ buffer: CVPixelBuffer) -> Data {

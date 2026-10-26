@@ -2,21 +2,24 @@ import Foundation
 
 struct SceneOptions {
     var vampire = true
+    var costume = true
+    var blood = true
+    var animateBlood = true
     var castle = true
     var bats = true
     var autoLightning = true
     var normal = false
     var intensity: Double = 0.85
+    var distance: Double = 0
+
+    var subjectScale: Double { castle && !normal ? 1 - min(1, max(0, distance)) * 0.45 : 1 }
     var lightningAt: TimeInterval = -100
     var swarmAt: TimeInterval = -100
     var vanishAt: TimeInterval = -100
 
     func flash(at time: TimeInterval) -> Double {
         guard !normal else { return 0 }
-        let manual = time - lightningAt
-        let automatic = autoLightning ? time.truncatingRemainder(dividingBy: 8.5) : 100
-        let age = min(manual >= 0 ? manual : 100, automatic)
-        return age < 0.55 ? pow(max(0, 1 - age / 0.55), 3) : 0
+        return Storm.strikes(at: time, automatic: autoLightning, manualAt: lightningAt).map(\.brightness).max() ?? 0
     }
 
     func isVanished(at time: TimeInterval) -> Bool {

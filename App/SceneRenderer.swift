@@ -6,16 +6,26 @@ final class SceneRenderer {
     let context = CIContext(options: [.cacheIntermediates: false])
     let bounds = CGRect(x: 0, y: 0, width: VideoFormat.width, height: VideoFormat.height)
     private let background: CIImage
+    private let costumeTexture: CGImage
+    private var previousPose: CostumePose?
     private var pool: CVPixelBufferPool?
     private let segmentation = VNGeneratePersonSegmentationRequest()
     private let faceRequest = VNDetectFaceLandmarksRequest()
+    private let bodyRequest = VNDetectHumanBodyPoseRequest()
     private var face: VNFaceObservation?
+    private var shoulders: [CGPoint] = []
+    private var frameNumber = 0
     var segmentationFailed = false
 
     init(assetURL: URL) throws {
         guard let image = CIImage(contentsOf: assetURL) else {
             throw NSError(domain: "Nocturne", code: 1, userInfo: [NSLocalizedDescriptionKey: "The castle artwork is missing. Reinstall the app."])
         }
+        guard let costume = NSImage(contentsOf: assetURL.deletingLastPathComponent().appendingPathComponent("vampire-attire.png")),
+              let texture = costume.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            throw NSError(domain: "Nocturne", code: 7, userInfo: [NSLocalizedDescriptionKey: "The vampire attire artwork is missing. Reinstall the app."])
+        }
+        costumeTexture = texture
         background = Self.fill(image, in: CGRect(x: 0, y: 0, width: VideoFormat.width, height: VideoFormat.height))
         segmentation.qualityLevel = .balanced
         segmentation.outputPixelFormat = kCVPixelFormatType_OneComponent8
@@ -31,22 +41,41 @@ final class SceneRenderer {
             y: rect.midY - scaled.extent.midY)).cropped(to: rect)
     }
 
+    static func subjectTransform(options: SceneOptions, bounds: CGRect) -> CGAffineTransform {
+        let scale = CGFloat(options.subjectScale)
+        // With attire, keep the head high and reveal the garment below the camera crop.
+        // Without attire, keep the real cutout at the bottom so its cropped edge cannot float.
+        let anchor = CGPoint(x: bounds.midX, y: options.costume ? bounds.height * 0.85 : bounds.minY)
+        return CGAffineTransform(translationX: anchor.x * (1 - scale), y: anchor.y * (1 - scale))
+            .scaledBy(x: scale, y: scale)
+    }
+
     func render(input: CVPixelBuffer?, options: SceneOptions, time: Double) throws -> CVPixelBuffer {
         var subject: CIImage?
         var mask: CIImage?
         segmentationFailed = false
         if let input {
             let camera = Self.fill(CIImage(cvPixelBuffer: input), in: bounds)
-            if options.normal { return try output(camera) }
+            if options.normal { previousPose = nil; return try output(camera) }
             var requests: [VNRequest] = []
-            if options.castle { requests.append(segmentation) }
-            if options.vampire { requests.append(faceRequest) }
+            let needsFace = options.vampire || options.costume
+            if options.castle || options.costume { requests.append(segmentation) }
+            if needsFace { requests.append(faceRequest) } else { face = nil }
+            let updateBody = options.costume && frameNumber % 4 == 0
+            frameNumber += 1
+            if updateBody { requests.append(bodyRequest) }
             if !requests.isEmpty {
                 do {
                     // Both requests see the exact same cropped, unmirrored image as the compositor.
                     try VNImageRequestHandler(ciImage: camera, options: [:]).perform(requests)
-                    face = options.vampire ? faceRequest.results?.max(by: { $0.boundingBox.width < $1.boundingBox.width }) : nil
-                    if options.castle, let result = segmentation.results?.first {
+                    face = needsFace ? faceRequest.results?.max(by: { $0.boundingBox.width < $1.boundingBox.width }) : nil
+                    if updateBody {
+                        shoulders = [VNHumanBodyPoseObservation.JointName.leftShoulder, .rightShoulder].compactMap { joint in
+                            guard let p = try? bodyRequest.results?.first?.recognizedPoint(joint), p.confidence > 0.3 else { return nil }
+                            return CGPoint(x: p.location.x * bounds.width, y: p.location.y * bounds.height)
+                        }
+                    }
+                    if options.castle || options.costume, let result = segmentation.results?.first {
                         let raw = CIImage(cvPixelBuffer: result.pixelBuffer)
                         mask = raw.transformed(by: CGAffineTransform(scaleX: bounds.width / raw.extent.width,
                             y: bounds.height / raw.extent.height))
@@ -54,13 +83,17 @@ final class SceneRenderer {
                     }
                 } catch {
                     face = nil
-                    segmentationFailed = true
+                    shoulders = []
+                    segmentationFailed = options.castle
                 }
             }
             subject = options.vampire ? vampireGrade(camera, intensity: options.intensity) : camera
             if options.castle && mask == nil { segmentationFailed = true }
-        } else { face = nil }
+        } else { face = nil; shoulders = []; previousPose = nil }
 
+        let placement = Self.subjectTransform(options: options, bounds: bounds)
+        subject = subject?.transformed(by: placement)
+        mask = mask?.transformed(by: placement)
         let flash = options.flash(at: time)
         let useCastle = options.castle || input == nil || options.isVanished(at: time)
         var scene = useCastle ? background : subject!
@@ -68,14 +101,43 @@ final class SceneRenderer {
             scene = scene.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: flash * 1.7])
             scene = overlay(time: time, options: options, foreground: false).composited(over: scene)
         }
+        if !options.costume { previousPose = nil }
+        let pose = options.costume && !options.isVanished(at: time) ? costumePose() : nil
+        if let pose, let mask {
+            let collar = canvas(transform: placement) { VampireCostume.draw(in: $0, pose: pose, texture: costumeTexture) }
+            if options.castle { scene = collar.composited(over: scene) }
+            else {
+                // Keep the real head and shoulders in front of the raised collar.
+                scene = scene.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: collar.composited(over: scene), kCIInputMaskImageKey: mask])
+            }
+        }
         if let subject, options.castle, let mask, !options.isVanished(at: time) {
             scene = subject.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: scene,
                 kCIInputMaskImageKey: mask])
         }
         // Fail closed: a failed cutout shows the castle, never exposes the room unexpectedly.
+        if let pose, let mask {
+            let costume = canvas(transform: placement) { c in
+                // Follow the actual jaw instead of cutting the garment with a horizontal seam.
+                if let face {
+                    let jaw = points(face.landmarks?.faceContour, on: face)
+                    if let first = jaw.first, let last = jaw.last {
+                        c.addRect(bounds); c.addLines(between: jaw)
+                        c.addLine(to: CGPoint(x: last.x, y: bounds.maxY))
+                        c.addLine(to: CGPoint(x: first.x, y: bounds.maxY)); c.closePath(); c.clip(using: .evenOdd)
+                    } else {
+                        c.clip(to: CGRect(x: 0, y: 0, width: bounds.width, height: pose.chin.y))
+                    }
+                }
+                VampireCostume.draw(in: c, pose: pose, texture: costumeTexture)
+            }
+            let clipped = costume.applyingFilter("CIBlendWithMask", parameters: [
+                kCIInputBackgroundImageKey: CIImage(color: .clear).cropped(to: bounds), kCIInputMaskImageKey: mask])
+            scene = clipped.composited(over: scene)
+        }
         if !options.isVanished(at: time), options.vampire, let face,
            (!options.castle || mask != nil) {
-            scene = faceOverlay(face, intensity: options.intensity).composited(over: scene)
+            scene = faceOverlay(face, options: options, time: time, transform: placement).composited(over: scene)
         }
         scene = overlay(time: time, options: options, foreground: true).composited(over: scene)
         return try output(scene)
@@ -89,40 +151,63 @@ final class SceneRenderer {
         let mask = CIFilter(name: "CIRadialGradient", parameters: ["inputCenter": center,
             "inputRadius0": radius * 0.5, "inputRadius1": radius,
             "inputColor0": CIColor.white, "inputColor1": CIColor.clear])!.outputImage!.cropped(to: bounds)
-        let pale = image.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1 - intensity * 0.7,
-            kCIInputBrightnessKey: intensity * 0.065, kCIInputContrastKey: 1 + intensity * 0.08])
+        let pale = image.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1 - intensity * 0.83,
+            kCIInputBrightnessKey: intensity * 0.08, kCIInputContrastKey: 1 + intensity * 0.14])
         return pale.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: image, kCIInputMaskImageKey: mask])
     }
 
-    private func canvas(_ draw: (CGContext) -> Void) -> CIImage {
+    private func canvas(transform: CGAffineTransform = .identity, _ draw: (CGContext) -> Void) -> CIImage {
         let c = CGContext(data: nil, width: VideoFormat.width, height: VideoFormat.height, bitsPerComponent: 8,
             bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        c.concatenate(transform)
         draw(c)
         return CIImage(cgImage: c.makeImage()!)
     }
 
-    private func faceOverlay(_ face: VNFaceObservation, intensity: Double) -> CIImage {
-        canvas { c in
+    private func points(_ region: VNFaceLandmarkRegion2D?, on face: VNFaceObservation) -> [CGPoint] {
+        guard let region else { return [] }
+        return (0..<region.pointCount).map { i in
+            let p = region.normalizedPoints[i]
+            return CGPoint(x: (face.boundingBox.minX + p.x * face.boundingBox.width) * bounds.width,
+                y: (face.boundingBox.minY + p.y * face.boundingBox.height) * bounds.height)
+        }
+    }
+
+    private func costumePose() -> CostumePose? {
+        guard let face else { previousPose = nil; return nil }
+        let box = face.boundingBox
+        let contour = points(face.landmarks?.faceContour, on: face)
+        let chin = contour.min(by: { $0.y < $1.y }) ?? CGPoint(x: box.midX * bounds.width, y: box.minY * bounds.height)
+        var pose = CostumePose(chin: chin, faceWidth: box.width * bounds.width, faceHeight: box.height * bounds.height, shoulders: shoulders)
+        if let previous = previousPose, hypot(previous.chin.x - chin.x, previous.chin.y - chin.y) < pose.faceWidth * 0.6 {
+            func blend(_ a: CGFloat, _ b: CGFloat) -> CGFloat { a + (b - a) * 0.38 }
+            let smoothedShoulders = previous.shoulders.count == 2 && shoulders.count == 2 ? zip(previous.shoulders, shoulders).map {
+                CGPoint(x: blend($0.x, $1.x), y: blend($0.y, $1.y))
+            } : shoulders
+            pose = CostumePose(chin: CGPoint(x: blend(previous.chin.x, chin.x), y: blend(previous.chin.y, chin.y)),
+                faceWidth: blend(previous.faceWidth, pose.faceWidth), faceHeight: blend(previous.faceHeight, pose.faceHeight), shoulders: smoothedShoulders)
+        }
+        previousPose = pose
+        return pose
+    }
+
+    private func faceOverlay(_ face: VNFaceObservation, options: SceneOptions, time: Double, transform: CGAffineTransform) -> CIImage {
+        canvas(transform: transform) { c in
+            let intensity = options.intensity
             guard intensity > 0 else { return }
             func points(_ region: VNFaceLandmarkRegion2D?) -> [CGPoint] {
-                guard let region else { return [] }
-                return (0..<region.pointCount).map { i in
-                    let p = region.normalizedPoints[i]
-                    return CGPoint(x: (face.boundingBox.minX + p.x * face.boundingBox.width) * bounds.width,
-                        y: (face.boundingBox.minY + p.y * face.boundingBox.height) * bounds.height)
-                }
+                self.points(region, on: face)
             }
+            let box = face.boundingBox
+            VampireMakeup.draw(in: c, eyes: [points(face.landmarks?.leftEye), points(face.landmarks?.rightEye)],
+                outerLips: points(face.landmarks?.outerLips), innerLips: points(face.landmarks?.innerLips),
+                face: CGRect(x: box.minX * bounds.width, y: box.minY * bounds.height, width: box.width * bounds.width, height: box.height * bounds.height),
+                intensity: intensity, blood: options.blood, time: time, animateBlood: options.animateBlood)
             for eye in [face.landmarks?.leftEye, face.landmarks?.rightEye] {
                 let p = points(eye)
                 guard p.count > 3 else { continue }
                 let r = p.reduce(CGRect.null) { $0.union(CGRect(origin: $1, size: CGSize(width: 0.1, height: 0.1))) }
                 guard r.height > r.width * 0.12 else { continue } // Do not paint closed eyelids.
-                c.saveGState()
-                c.setShadow(offset: .zero, blur: r.width * 0.16,
-                    color: CGColor(red: 0.12, green: 0.02, blue: 0.09, alpha: intensity * 0.5))
-                c.setFillColor(CGColor(red: 0.13, green: 0.045, blue: 0.11, alpha: intensity * 0.25))
-                c.fillEllipse(in: r.insetBy(dx: -r.width * 0.12, dy: -r.height * 0.5))
-                c.restoreGState()
                 c.saveGState()
                 c.addLines(between: p); c.closePath(); c.clip()
                 c.setFillColor(CGColor(red: 0.65, green: 0.02, blue: 0.07, alpha: intensity * 0.95))
@@ -148,15 +233,8 @@ final class SceneRenderer {
     private func overlay(time: Double, options: SceneOptions, foreground: Bool) -> CIImage {
         canvas { c in
             guard !options.normal else { return }
-            let flash = options.flash(at: time)
-            if !foreground, flash > 0 {
-                let x: CGFloat = 990
-                let points = [CGPoint(x: x, y: 720), CGPoint(x: x - 30, y: 650), CGPoint(x: x + 5, y: 610),
-                    CGPoint(x: x - 75, y: 530), CGPoint(x: x - 45, y: 570), CGPoint(x: x - 60, y: 600)]
-                c.setShadow(offset: .zero, blur: 20, color: CGColor(red: 0.6, green: 0.75, blue: 1, alpha: flash))
-                c.setStrokeColor(CGColor(red: 0.83, green: 0.9, blue: 1, alpha: flash))
-                c.setLineWidth(3); c.addLines(between: points); c.strokePath()
-                c.setShadow(offset: .zero, blur: 0)
+            if !foreground {
+                Storm.draw(Storm.strikes(at: time, automatic: options.autoLightning, manualAt: options.lightningAt), in: c, bounds: bounds)
             }
             let swarmAge = time - options.swarmAt
             let swarm = (0..<4).contains(swarmAge)

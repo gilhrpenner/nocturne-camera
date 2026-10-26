@@ -9,11 +9,14 @@ final class CameraModel: ObservableObject {
     @Published var running = false
     @Published var starting = false
     @Published var vampire = true { didSet { state.update { $0.vampire = vampire } } }
+    @Published var costume = true { didSet { state.update { $0.costume = costume } } }
+    @Published var blood = true { didSet { state.update { $0.blood = blood } } }
     @Published var castle = true { didSet { state.update { $0.castle = castle } } }
     @Published var bats = true { didSet { state.update { $0.bats = bats } } }
     @Published var lightning = true { didSet { state.update { $0.autoLightning = lightning } } }
     @Published var normal = false { didSet { state.update { $0.normal = normal } } }
     @Published var intensity = 0.85 { didSet { state.update { $0.intensity = intensity } } }
+    @Published var distance = 0.0 { didSet { state.update { $0.distance = distance } } }
     @Published var shortcutStatus = "Shortcuts work while Teams has focus."
     let state = SceneState()
     let pipeline: CameraPipeline
@@ -24,7 +27,7 @@ final class CameraModel: ObservableObject {
         state.update { $0.intensity = 0.85 }
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             bats = false; lightning = false
-            state.update { $0.bats = false; $0.autoLightning = false }
+            state.update { $0.bats = false; $0.autoLightning = false; $0.animateBlood = false }
         }
         pipeline.onFrame = { [weak self] image, status in self?.preview = image; self?.status = status }
         pipeline.onError = { [weak self] message in self?.error = message; self?.running = false; self?.starting = false }
@@ -84,6 +87,21 @@ struct ContentView: View {
                         Toggle("Normal camera", isOn: $model.normal).toggleStyle(.switch)
                             .help("Bypasses the castle and every effect. Control–Option–N.")
                     }
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Distance").font(.callout)
+                            Text("\(Int((1 - model.distance * 0.45) * 100))% size").font(.caption).monospacedDigit().foregroundStyle(Theme.muted)
+                            Spacer()
+                            Button("Reset") { model.distance = 0 }.buttonStyle(.link).disabled(model.distance == 0)
+                        }
+                        HStack(spacing: 10) {
+                            Text("Original").font(.caption).foregroundStyle(Theme.muted)
+                            Slider(value: $model.distance, in: 0...1).accessibilityLabel("Distance")
+                                .help("Move right to appear farther away. Your makeup and costume follow you.")
+                            Text("Farther").font(.caption).foregroundStyle(Theme.muted)
+                        }
+                        if !model.castle { Text("Turn on Castle & person cutout to adjust distance.").font(.caption).foregroundStyle(Theme.muted) }
+                    }.disabled(!model.castle || model.normal)
                     if let error = model.error {
                         Label(error, systemImage: "exclamationmark.triangle").font(.callout)
                             .foregroundStyle(Theme.accent).textSelection(.enabled)
@@ -97,10 +115,13 @@ struct ContentView: View {
                     }
                     Text(model.shortcutStatus).font(.caption).foregroundStyle(Theme.muted)
                 }.frame(maxWidth: .infinity)
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 14) {
                     Text("The vampire").font(.custom("Baskerville", size: 23))
                     Toggle("Theatrical makeup", isOn: $model.vampire).help("Control–Option–V")
-                    Text("Pale skin, crimson eyes, and long fangs—even with closed lips.").font(.callout).foregroundStyle(Theme.muted)
+                    Text("Sunken eyes, dark veins, pale skin, and long fangs.").font(.callout).foregroundStyle(Theme.muted)
+                    Toggle("Blood trails", isOn: $model.blood).disabled(!model.vampire || model.normal)
+                    Toggle("Vampire attire", isOn: $model.costume).disabled(model.normal)
+                        .help("A textured black cape, swept collar, brocade waistcoat, and silk cravat.")
                     VStack(alignment: .leading, spacing: 6) {
                         HStack { Text("Intensity"); Spacer(); Text(model.intensity, format: .percent.precision(.fractionLength(0))).monospacedDigit() }
                         Slider(value: $model.intensity, in: 0...1).accessibilityLabel("Vampire intensity")
@@ -109,7 +130,7 @@ struct ContentView: View {
                     Text("The grounds").font(.custom("Baskerville", size: 23))
                     Toggle("Castle & person cutout", isOn: $model.castle)
                     Toggle("Flying bats", isOn: $model.bats)
-                    Toggle("Lightning every 8 seconds", isOn: $model.lightning)
+                    Toggle("Restless lightning storm", isOn: $model.lightning)
                     Text("Even light on your face helps the cutout. A plain wall is ideal.").font(.caption).foregroundStyle(Theme.muted)
                     Divider()
                     Button("Enable Teams camera", systemImage: "video.badge.checkmark") { camera.activate() }
