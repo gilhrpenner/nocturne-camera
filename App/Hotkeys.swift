@@ -19,7 +19,7 @@ final class Hotkeys {
         }, 1, &type, context, &handler)
         guard result == noErr else { return false }
         var success = true
-        for (i, key) in [kVK_ANSI_L, kVK_ANSI_B, kVK_ANSI_V, kVK_ANSI_N, kVK_ANSI_G].enumerated() {
+        for (i, key) in [kVK_ANSI_L, kVK_ANSI_B, kVK_ANSI_V, kVK_ANSI_N, kVK_ANSI_G, kVK_ANSI_E].enumerated() {
             var ref: EventHotKeyRef?
             let status = RegisterEventHotKey(UInt32(key), UInt32(controlKey | optionKey),
                 EventHotKeyID(signature: 0x4E4F4354, id: UInt32(i)), GetApplicationEventTarget(), 0, &ref)

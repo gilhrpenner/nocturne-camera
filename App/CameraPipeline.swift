@@ -12,7 +12,7 @@ final class CameraPipeline: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
     private var running = false
     private var lastFrame = 0.0
     private var lastUI = 0.0
-    var onFrame: ((CGImage, String, String) -> Void)?
+    var onFrame: ((CGImage, String, String, String) -> Void)?
     var onError: ((String) -> Void)?
     var onRunning: ((Bool) -> Void)?
 
@@ -88,6 +88,7 @@ final class CameraPipeline: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
     }
 
     func stop() {
+        state.update { $0.cancelPerformance() }
         work.async {
             self.running = false; self.session.stopRunning(); self.sink.stop(); self.startDemo()
             DispatchQueue.main.async { self.onRunning?(false) }
@@ -107,7 +108,8 @@ final class CameraPipeline: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
         autoreleasepool {
             do {
                 let time = ProcessInfo.processInfo.systemUptime
-                let buffer = try renderer.render(input: input, options: state.read(), time: time)
+                let options = state.read()
+                let buffer = try renderer.render(input: input, options: options, time: time)
                 if publish { sink.send(buffer) }
                 if time - lastUI > 1.0 / 15,
                    let cg = renderer.context.createCGImage(CIImage(cvPixelBuffer: buffer), from: renderer.bounds) {
@@ -115,7 +117,8 @@ final class CameraPipeline: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
                     let status = renderer.segmentationFailed ? "Cutout unavailable — showing castle for privacy" :
                         (publish ? sink.status : "Scene preview · camera off")
                     let tracking = renderer.trackingStatus
-                    DispatchQueue.main.async { self.onFrame?(cg, status, tracking) }
+                    let cue = publish ? options.performance(at: time)?.label ?? "" : ""
+                    DispatchQueue.main.async { self.onFrame?(cg, status, tracking, cue) }
                 }
             } catch {
                 if running { running = false; session.stopRunning(); sink.stop() }
@@ -124,5 +127,8 @@ final class CameraPipeline: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
         }
     }
 
-    private func report(_ message: String) { DispatchQueue.main.async { self.onError?(message) } }
+    private func report(_ message: String) {
+        state.update { $0.cancelPerformance() }
+        DispatchQueue.main.async { self.onError?(message) }
+    }
 }

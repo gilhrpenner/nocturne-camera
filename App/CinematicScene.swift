@@ -52,7 +52,7 @@ final class CinematicScene {
         if options.normal { return classic }
         let flash = options.flash(at: time)
         let lightning = SceneCanvas.image(bounds: bounds) { c in
-            Storm.draw(Storm.strikes(at: time, automatic: options.autoLightning, manualAt: options.lightningAt), in: c, bounds: bounds)
+            Storm.draw(options.strikes(at: time), in: c, bounds: bounds)
         }
         if !options.cinematic {
             return weather.image(time: time, options: options, near: false, bounds: bounds)
@@ -86,7 +86,8 @@ final class CinematicScene {
             .transformed(by: CGAffineTransform(translationX: 0, y: bounds.height * 0.23).scaledBy(x: 1, y: 0.65))
             .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 16])
         scene = valleyMist.composited(over: scene)
-        let castleLight = castle.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: flash * 1.15 - 0.12 + sin(t * 0.4) * 0.025])
+        let hauntedCastle = HauntedWindows.image(time: time, options: options, bounds: bounds)?.composited(over: castle) ?? castle
+        let castleLight = hauntedCastle.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: flash * 1.15 - 0.12 + sin(t * 0.4) * 0.025])
         scene = project(castleLight, distance: 2800).composited(over: scene)
         scene = weather.image(time: time, options: options, near: false, bounds: bounds).composited(over: scene)
         let terraceLight = terrace.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: flash * 0.9 - 0.08])

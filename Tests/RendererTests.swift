@@ -34,7 +34,7 @@ struct RendererTests {
         let bats = bytes(try renderer.render(input: nil, options: options, time: 103))
         precondition(bats != dark, "Bat cue must change the scene")
         options.vanishAt = 105
-        precondition(options.isVanished(at: 106) && !options.isVanished(at: 108), "Vanish must expire after 3 seconds")
+        precondition(options.isVanished(at: 107.5) && options.performance(at: 111.01) == nil, "Vanish must dissolve, pause and return")
         options.normal = true; options.fogAmount = 1
         options.distance = 1
         precondition(options.flash(at: 100) == 0 && !options.isVanished(at: 106), "Normal mode must suppress effects")

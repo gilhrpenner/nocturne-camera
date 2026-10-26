@@ -10,6 +10,7 @@ final class SceneRenderer {
     private let headTreatment = HeadTreatment()
     private let fog = Fog()
     private let weather = SceneWeather()
+    private let batDissolve: BatDissolve
     private let bodyTracker = BodyTracker()
     private let costumeStabilizer = CostumeStabilizer()
     private var pool: CVPixelBufferPool?
@@ -26,6 +27,7 @@ final class SceneRenderer {
     init(assetURL: URL) throws {
         let directory = assetURL.deletingLastPathComponent()
         background = try CinematicScene(directory: directory, bounds: bounds)
+        batDissolve = try BatDissolve(sprite: BatSprite(url: directory.appendingPathComponent("transformation-bat.png")))
         guard let texture = CIImage(contentsOf: directory.appendingPathComponent("vampire-attire.png")) else {
             throw NSError(domain: "Nocturne", code: 7, userInfo: [NSLocalizedDescriptionKey: "The vampire attire artwork is missing. Reinstall the app."])
         }
@@ -50,6 +52,7 @@ final class SceneRenderer {
     private func resetTracking() {
         face = nil; bodyTracker.reset(); poseAnalyzer.reset(); handHulls = []; handTime = -.infinity
         costumeStabilizer.reset()
+        batDissolve.reset()
         trackingStatus = "Camera off"; background.resetView()
     }
 
@@ -114,7 +117,9 @@ final class SceneRenderer {
         let placement = Self.subjectTransform(options: options, bounds: bounds)
         let placedSubject = subject?.transformed(by: placement)
         let placedMask = mask?.transformed(by: placement).cropped(to: bounds)
-        let useCastle = options.castle || input == nil || options.isVanished(at: time)
+        let performance = input == nil ? nil : options.performance(at: time)
+        if performance == nil { batDissolve.reset() }
+        let useCastle = options.castle || input == nil
         let anchor = faceAnchor()
         var scene = useCastle ? background.render(time: time, options: options, head: anchor.map { CGPoint(x: $0.bounds.midX, y: $0.bounds.midY) }) : subject!
 
@@ -123,7 +128,13 @@ final class SceneRenderer {
         if !options.preserveHands || time - handTime > 0.22 { handHulls = [] }
 
         // Assemble one transparent actor so moonlight and lightning affect every layer coherently.
-        if !options.isVanished(at: time), let placedSubject, (!options.castle || placedMask != nil) {
+        let performanceAnchor = anchor.map { CGPoint(x: $0.bounds.midX, y: $0.bounds.midY).applying(placement) }
+        if let performance, performance.dissolution == 1, !batDissolve.needsCapture(for: performance) {
+            // Once airborne, the flock only needs its captured fragments. Keep tracking live for the return.
+            let flock = batDissolve.image(actor: CIImage(color: .clear).cropped(to: bounds), performance: performance,
+                context: context, bounds: bounds, anchor: performanceAnchor, flash: options.flash(at: time))
+            scene = flock.composited(over: scene)
+        } else if let placedSubject, (!options.castle || placedMask != nil) {
             var actor = placedMask.map { clipped(placedSubject, by: $0) } ?? placedSubject
             if options.costume { actor = CIImage(color: .clear).cropped(to: bounds) }
             var foregroundHands: CIImage?
@@ -157,6 +168,8 @@ final class SceneRenderer {
                 actor = CIImage(cvPixelBuffer: try output(actor))
                 actor = SceneLighting.apply(to: actor, amount: options.relighting, flash: options.flash(at: time), bounds: bounds)
             }
+            actor = batDissolve.image(actor: actor, performance: performance, context: context, bounds: bounds,
+                anchor: performanceAnchor, flash: options.flash(at: time))
             scene = actor.composited(over: scene)
         }
         if !options.normal && options.fogAmount > 0 {

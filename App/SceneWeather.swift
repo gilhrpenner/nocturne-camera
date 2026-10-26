@@ -33,21 +33,9 @@ final class SceneWeather {
                 let y = bounds.height * CGFloat(baseY + Storm.random(seed, 5) * 0.22) + sin(t * 0.8 + Double(seed)) * (near ? 45 : 28)
                 let size = CGFloat(swarm ? 10 + Storm.random(seed, 6) * 17 : (near ? 18 : 5 + Storm.random(seed, 6) * 7))
                 let scale = 0.75 + 0.25 * sin(phase * .pi)
-                self.bat(c, point: CGPoint(x: x, y: y), size: size * scale, flap: sin(t * 11 + Double(seed) * 1.8), distant: !near)
+                BatPainter.draw(in: c, point: CGPoint(x: x, y: y), size: size * scale, flap: sin(t * 11 + Double(seed) * 1.8), distant: !near)
             }
         }
     }
 
-    private func bat(_ c: CGContext, point: CGPoint, size: CGFloat, flap: CGFloat, distant: Bool) {
-        c.saveGState(); c.translateBy(x: point.x, y: point.y); c.scaleBy(x: size, y: size)
-        c.setFillColor(CGColor(red: distant ? 0.035 : 0.018, green: distant ? 0.045 : 0.022, blue: distant ? 0.06 : 0.03, alpha: 0.97))
-        for side: CGFloat in [-1, 1] {
-            c.move(to: CGPoint(x: 0, y: 0.15))
-            c.addCurve(to: CGPoint(x: side * 1.55, y: 0.15 + flap * 0.7), control1: CGPoint(x: side * 0.4, y: 0.8), control2: CGPoint(x: side * 0.9, y: 0.9 + flap * 0.4))
-            c.addQuadCurve(to: CGPoint(x: side * 0.85, y: -0.35), control: CGPoint(x: side * 1.1, y: 0))
-            c.addQuadCurve(to: CGPoint(x: side * 0.35, y: -0.25), control: CGPoint(x: side * 0.55, y: -0.05))
-            c.addLine(to: CGPoint(x: 0, y: -0.5)); c.closePath(); c.fillPath()
-        }
-        c.fillEllipse(in: CGRect(x: -0.12, y: -0.3, width: 0.24, height: 0.6)); c.restoreGState()
-    }
 }

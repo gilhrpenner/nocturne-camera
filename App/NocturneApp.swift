@@ -5,6 +5,7 @@ import AppKit
 final class CameraModel: ObservableObject {
     @Published var preview: CGImage?
     @Published var trackingStatus = "Camera off"
+    @Published var performanceStatus = ""
     @Published var status = "Preparing the castle…"
     @Published var error: String?
     @Published var running = false
@@ -14,7 +15,7 @@ final class CameraModel: ObservableObject {
     @Published var blood = true { didSet { state.update { $0.blood = blood } } }
     @Published var hairStyle: HairStyle = .white { didSet { state.update { $0.hairStyle = hairStyle } } }
     @Published var hairAmount = 1.0 { didSet { state.update { $0.hairAmount = hairAmount } } }
-    @Published var castle = true { didSet { state.update { $0.castle = castle } } }
+    @Published var castle = true { didSet { state.update { $0.castle = castle; if !castle { $0.cancelPerformance() } } } }
     @Published var cinematic = true { didSet { state.update { $0.cinematic = cinematic } } }
     @Published var sceneDepth = 0.65 { didSet { state.update { $0.sceneDepth = sceneDepth } } }
     @Published var rainAmount = 0.18 { didSet { state.update { $0.rainAmount = rainAmount } } }
@@ -23,10 +24,11 @@ final class CameraModel: ObservableObject {
     @Published var costumeLift = 0.0 { didSet { state.update { $0.costumeLift = costumeLift } } }
     @Published var preserveHands = true { didSet { state.update { $0.preserveHands = preserveHands } } }
     @Published var animateScene = true { didSet { state.update { $0.animateScene = animateScene } } }
+    @Published var hauntedWindows = true { didSet { state.update { $0.hauntedWindows = hauntedWindows } } }
     @Published var bats = true { didSet { state.update { $0.bats = bats } } }
     @Published var lightning = true { didSet { state.update { $0.autoLightning = lightning } } }
     @Published var fogAmount = 0.55 { didSet { state.update { $0.fogAmount = fogAmount } } }
-    @Published var normal = false { didSet { state.update { $0.normal = normal } } }
+    @Published var normal = false { didSet { state.update { $0.normal = normal; if normal { $0.cancelPerformance() } } } }
     @Published var intensity = 0.85 { didSet { state.update { $0.intensity = intensity } } }
     @Published var distance = 0.0 { didSet { state.update { $0.distance = distance } } }
     @Published var shortcutStatus = "Shortcuts work while Teams has focus."
@@ -41,8 +43,8 @@ final class CameraModel: ObservableObject {
             bats = false; lightning = false; animateScene = false
             state.update { $0.bats = false; $0.autoLightning = false; $0.animateBlood = false; $0.animateFog = false; $0.animateScene = false }
         }
-        pipeline.onFrame = { [weak self] image, status, tracking in
-            self?.preview = image; self?.status = status; self?.trackingStatus = tracking
+        pipeline.onFrame = { [weak self] image, status, tracking, performance in
+            self?.preview = image; self?.status = status; self?.trackingStatus = tracking; self?.performanceStatus = performance
         }
         pipeline.onError = { [weak self] message in self?.error = message; self?.running = false; self?.starting = false }
         pipeline.onRunning = { [weak self] running in self?.running = running; self?.starting = false }
@@ -57,11 +59,13 @@ final class CameraModel: ObservableObject {
     func trigger(_ id: Int) {
         let now = ProcessInfo.processInfo.systemUptime
         switch id {
-        case 0: state.update { $0.lightningAt = now }
-        case 1: state.update { $0.swarmAt = now }
+        case 0: if !normal { state.update { $0.lightningAt = now } }
+        case 1: if !normal { state.update { $0.swarmAt = now } }
         case 2: vampire.toggle()
         case 3: normal.toggle()
-        case 4: state.update { $0.vanishAt = now; $0.swarmAt = now }
+        case 4, 5:
+            guard running else { return }
+            state.update { $0.beginPerformance(id == 4 ? .vanish : .entrance, at: now) }
         default: break
         }
     }
@@ -127,9 +131,11 @@ struct ContentView: View {
                     HStack(spacing: 10) {
                         cue("Lightning", symbol: "bolt.fill", keys: "⌃⌥L", id: 0)
                         cue("Bat swarm", symbol: "wind", keys: "⌃⌥B", id: 1)
-                        cue("Vanish · 3s", symbol: "sparkles", keys: "⌃⌥G", id: 4)
+                        cue("Vanish & return", symbol: "sparkles", keys: "⌃⌥G", id: 4)
+                        cue("Grand entrance", symbol: "theatermasks.fill", keys: "⌃⌥E", id: 5)
                     }
-                    Text(model.shortcutStatus).font(.caption).foregroundStyle(Theme.muted)
+                    Text(cueHint).font(.caption).foregroundStyle(model.performanceStatus.isEmpty ? Theme.muted : Theme.accent)
+                        .frame(minHeight: 30, alignment: .topLeading).accessibilityLabel("Cue status: \(cueHint)")
                 }.frame(maxWidth: .infinity)
                 VStack(alignment: .leading, spacing: 18) {
                     Picker("Controls", selection: $panel) {
@@ -192,7 +198,9 @@ struct ContentView: View {
                 .help("Layered mountains, castle and terrace with perspective, drifting mist and matched light. Turn off for the classic backdrop.")
             VStack(alignment: .leading, spacing: 14) {
                 Toggle("Scene motion", isOn: $model.animateScene)
-                    .help("Freeze the layered scenery, rain and ambient bats. Fog and lightning have separate controls.")
+                    .help("Freeze the layered scenery, rain and ambient bats, and stop window appearances. Fog and lightning have separate controls.")
+                Toggle("Haunted windows", isOn: $model.hauntedWindows).disabled(!model.animateScene)
+                    .help("A distant figure occasionally crosses a lit castle window.")
                 amount("Depth", value: $model.sceneDepth).disabled(!model.animateScene)
                 amount("Moonlight", value: $model.relighting)
                 amount("Rain", value: $model.rainAmount)
@@ -232,7 +240,17 @@ struct ContentView: View {
                 HStack { Image(systemName: symbol); Spacer(); Text(keys).font(.system(.caption, design: .monospaced)).foregroundStyle(Theme.muted) }
                 Text(title).font(.callout.weight(.medium))
             }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
-        }.buttonStyle(.bordered).disabled(model.normal).help("Trigger \(title) — \(keys)")
+        }.buttonStyle(.bordered).disabled(model.normal || (id >= 4 && (!model.running || !model.castle || !model.performanceStatus.isEmpty)))
+            .help(id == 4 ? "Transform into bats, then reform automatically in six seconds. \(keys). Requires camera and castle cutout." :
+                id == 5 ? "Gather a flock into your silhouette with a coordinated lightning reveal. \(keys). Requires camera and castle cutout." :
+                "Trigger \(title) — \(keys)")
+    }
+
+    private var cueHint: String {
+        if model.normal { return "Normal camera bypasses every effect." }
+        if !model.running { return "Start camera for Vanish & return and Grand entrance." }
+        if !model.castle { return "Turn on Castle & person cutout for Vanish & return and Grand entrance." }
+        return model.performanceStatus.isEmpty ? model.shortcutStatus : model.performanceStatus
     }
 }
 

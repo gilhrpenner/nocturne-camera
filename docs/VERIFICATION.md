@@ -1,14 +1,20 @@
-# Verification — Nocturne 0.7, 2026-10-26
+# Verification — Nocturne 0.8, 2026-10-26
 
 ## Current status
 
-- Eight test suites pass: renderer, fangs, storm/makeup, head/hair treatment, fog, layered scene, tracking stability, and actor/eye appearance.
-- Universal Release build, deep/strict signing checks, and the camera App Group/Mach service contract pass. Host version is 0.7.0 (build 9); the camera extension remains 0.1.1 (build 2).
+- Nine test suites pass: renderer, fangs, storm/makeup, head/hair treatment, fog, layered scene, tracking stability, actor/eye appearance, and theatrical performances.
+- Universal Release build, deep/strict signing checks, and the camera App Group/Mach service contract pass. Host version is 0.8.0 (build 10); the camera extension remains 0.1.1 (build 2).
 - The camera extension is activated, and video delivery through the Teams meeting preview in Safari has been verified. The updated app's native controls and camera-off startup have been checked.
 - The outfit stability regression reduced maximum frame-to-frame jumps from 10 to 0.37 pixels under stationary landmark noise, from 46.34 to 3.66 pixels on hip loss/reacquisition, and from 45.89 to 3.37 pixels on body loss/reacquisition. A sustained lean still moves the garment.
 - Pixel tests verify removal of real shoulders, retention of the head and neck, collar depth, person-mask isolation, pupil alignment, blinking, white-hair strand contrast, and forehead protection under warm and neutral light.
 - Visual replays were inspected locally. Personal reference images, replay outputs, build products, and signed app bundles are excluded from Git.
 - Static UI audit reports zero findings; design lint reports zero errors and the existing advisory about `accent` instead of `primary`.
+- Performance tests cover cue overlap/cancellation, automatic return, synchronized entrance lightning, real actor pixels in fragments, silhouette-only origins, moving fragment alignment, articulated transparent bat artwork, a completely empty interval, complete reassembly, and occasional window visits with motion/classic/bypass guards.
+- Production-renderer filmstrips show the departing and returning transformation and the grand entrance. Enlarged castle-window replays verify the figure stays behind the existing glass and stone mullions. The dedicated photographic bat asset and its exact generation prompt are included in source.
+- A 150-frame optimized replay of the six-second transformation averaged 40.8 ms per frame on the development Mac, with 64.4 ms at the 95th percentile and an 80.9 ms maximum. The app was closed during this measurement. Skipping reconstruction of the invisible actor and balancing the flock reduced the same replay's mean from 53.8 ms. This is a local renderer measurement, not a sustained Teams frame-rate guarantee.
+- The installed native app shows all four cues and Haunted windows. Camera-off cue guards, Scene motion disabling Haunted windows, its toggle, Normal camera disabling every cue, and restoring the default settings were verified. Layout was inspected at the existing 1305-pixel window width; automated resize gestures did not change the window, so minimum-size layout remains a manual check.
+
+Design reconciliation: the existing palette, typography, native controls and `ContentView.cue` owner are preserved. The four-button cue row, cue status and availability rules, and Haunted windows are intentional additions documented in `DESIGN.md`; no token drift was introduced.
 
 Long-duration call performance, physical global shortcuts while Teams has focus, and extension removal remain interactive checks. The app is development-signed for local installation; no notarized public binary is provided.
 
