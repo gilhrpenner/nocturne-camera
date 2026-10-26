@@ -21,7 +21,7 @@ def write_plist(path, data):
 base_info = dict(CFBundleDevelopmentRegion='en', CFBundleVersion='2', CFBundleShortVersionString='0.1.1',
                  CFBundleIdentifier='$(PRODUCT_BUNDLE_IDENTIFIER)', CFBundleExecutable='$(EXECUTABLE_NAME)',
                  CFBundleName='$(PRODUCT_NAME)')
-write_plist('App/Info.plist', dict(base_info, CFBundleVersion='7', CFBundleShortVersionString='0.5.0', CFBundlePackageType='APPL', LSMinimumSystemVersion='14.0',
+write_plist('App/Info.plist', dict(base_info, CFBundleVersion='9', CFBundleShortVersionString='0.7.0', CFBundlePackageType='APPL', LSMinimumSystemVersion='14.0',
     NSCameraUsageDescription='Nocturne uses your camera to create your live vampire scene. Video stays on your Mac.',
     NSSystemExtensionUsageDescription='Nocturne Camera lets Teams and other video apps receive your Halloween scene.',
     NSPrincipalClass='NSApplication', NSHighResolutionCapable=True))
@@ -78,9 +78,8 @@ proxy=add('proxy',dict(isa='PBXContainerItemProxy',containerPortal=uid('project'
 dependency=add('dependency',dict(isa='PBXTargetDependency',target=ext,targetProxy=proxy))
 embedfile=add('embedFile',dict(isa='PBXBuildFile',fileRef=ext_product,settings={'ATTRIBUTES':['CodeSignOnCopy','RemoveHeadersOnCopy']}))
 embed=add('embedPhase',dict(isa='PBXCopyFilesBuildPhase',buildActionMask='2147483647',dstPath='$(CONTENTS_FOLDER_PATH)/Library/SystemExtensions',dstSubfolderSpec='16',files=[embedfile],name='Embed Camera Extension',runOnlyForDeploymentPostprocessing='0'))
-asset=add('castleAsset',dict(isa='PBXBuildFile',fileRef=file_ids['Resources/castle.png']))
-costume_asset=add('costumeAsset',dict(isa='PBXBuildFile',fileRef=file_ids['Resources/vampire-attire.png']))
-resources=add('resources',dict(isa='PBXResourcesBuildPhase',buildActionMask='2147483647',files=[asset,costume_asset],runOnlyForDeploymentPostprocessing='0'))
+assets=[add('asset/'+path,dict(isa='PBXBuildFile',fileRef=ref)) for path,ref in file_ids.items() if path.startswith('Resources/') and path.endswith('.png')]
+resources=add('resources',dict(isa='PBXResourcesBuildPhase',buildActionMask='2147483647',files=assets,runOnlyForDeploymentPostprocessing='0'))
 appconfig=config_list('app',dict(PRODUCT_BUNDLE_IDENTIFIER='com.gilpenner.Nocturne',PRODUCT_NAME='Nocturne',
     INFOPLIST_FILE='App/Info.plist',CODE_SIGN_ENTITLEMENTS='App/Nocturne.entitlements',
     ENABLE_APP_SANDBOX='NO',LD_RUNPATH_SEARCH_PATHS=['$(inherited)','@executable_path/../Frameworks']))

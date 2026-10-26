@@ -12,7 +12,7 @@ final class CameraPipeline: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
     private var running = false
     private var lastFrame = 0.0
     private var lastUI = 0.0
-    var onFrame: ((CGImage, String) -> Void)?
+    var onFrame: ((CGImage, String, String) -> Void)?
     var onError: ((String) -> Void)?
     var onRunning: ((Bool) -> Void)?
 
@@ -114,7 +114,8 @@ final class CameraPipeline: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
                     lastUI = time
                     let status = renderer.segmentationFailed ? "Cutout unavailable — showing castle for privacy" :
                         (publish ? sink.status : "Scene preview · camera off")
-                    DispatchQueue.main.async { self.onFrame?(cg, status) }
+                    let tracking = renderer.trackingStatus
+                    DispatchQueue.main.async { self.onFrame?(cg, status, tracking) }
                 }
             } catch {
                 if running { running = false; session.stopRunning(); sink.stop() }

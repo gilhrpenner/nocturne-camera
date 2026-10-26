@@ -23,10 +23,10 @@ enum VampireMakeup {
             let box = eye.reduce(CGRect.null) { $0.union(CGRect(origin: $1, size: CGSize(width: 0.1, height: 0.1))) }
             // Exclude the eyeball itself from the smudged charcoal/plum eye socket.
             c.saveGState(); c.addRect(face.insetBy(dx: -width, dy: -width)); c.addLines(between: eye); c.closePath(); c.clip(using: .evenOdd)
-            haze(center: CGPoint(x: box.midX, y: box.midY), radius: box.width * 1.05, aspect: 0.64,
-                color: CGColor(red: 0.035, green: 0.018, blue: 0.035, alpha: 0.87))
+            haze(center: CGPoint(x: box.midX, y: box.midY), radius: box.width * 0.9, aspect: 0.57,
+                color: CGColor(red: 0.035, green: 0.018, blue: 0.035, alpha: 0.6))
             haze(center: CGPoint(x: box.midX, y: box.minY - box.width * 0.24), radius: box.width * 0.8, aspect: 0.65,
-                color: CGColor(red: 0.19, green: 0.05, blue: 0.09, alpha: 0.28))
+                color: CGColor(red: 0.19, green: 0.05, blue: 0.09, alpha: 0.18))
             c.restoreGState()
             // Asymmetric, hairline branches rather than repeated straight strokes.
             let side: CGFloat = box.midX < face.midX ? -1 : 1

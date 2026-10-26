@@ -53,15 +53,15 @@ The signature is the large live castle composition. No animated chrome or orname
 
 ## Typography
 
-Baskerville for the name and two section titles; macOS system text for controls and help; monospaced text for shortcut hints and numeric settings. English only in this first build; system fonts supply fallback glyphs.
+Baskerville for the name and control-panel titles; macOS system text for controls and help; monospaced text for shortcut hints and numeric settings. English only in this first build; system fonts supply fallback glyphs.
 
 ## Layout
 
-Native desktop window, minimum 1040 by 680. Header, broad 16:9 preview and cues on the left, 300-point control panel on the right. Main page inset 24 points; sections separated by 20 points. Stable preview footprint while loading. A scroll container keeps controls reachable on shorter screens.
+Native desktop window, minimum 1040 by 680. Header, broad 16:9 preview and cues on the left, 300-point control panel on the right. Main page inset 24 points; sections separated by 20 points. Stable preview footprint while loading. A single scroll container keeps controls reachable on shorter screens. A native segmented Look / Scene / Setup picker switches the right panel while preserving the large preview, camera controls, distance, and cues on the left. Controls retain their values when switching panels; there is no nested scrolling.
 
 ## Elevation & Depth
 
-Tonal panel separation, native control borders, and no ornamental shadows. All depth belongs in the castle scene.
+Tonal panel separation, native control borders, and no ornamental shadows. All depth belongs in the castle scene: separate valley, castle, and near terrace layers, restrained head-responsive parallax, and coherent moonlight/flash on the actor. The UI retains its existing flat tonal hierarchy.
 
 ## Shapes
 
@@ -69,13 +69,13 @@ Tonal panel separation, native control borders, and no ornamental shadows. All d
 
 ## Components
 
-Canonical owners: controls and confirmation dialogs use SwiftUI; effect cues use `ContentView.cue`; persistent status belongs to `CameraModel` or `ExtensionManager`. No tables, dates, navigation flows, or remote data exist. Hair selection uses a native SwiftUI picker. No comparable sibling screen exists in this new one-window app.
+Canonical owners: controls and confirmation dialogs use SwiftUI; effect cues use `ContentView.cue`; persistent status belongs to `CameraModel` or `ExtensionManager`. No tables, dates, navigation flows, or remote data exist. Hair selection and the three control panels use native SwiftUI pickers. Repeated percentage sliders use `ContentView.amount`; outfit calibration uses a native DisclosureGroup, with width, collar height, hands-in-front, and Reset fit. Look shows a text tracking state instead of an ornamental confidence gauge. No comparable sibling screen exists in this new one-window app.
 
 Start camera explicitly requests camera access. No microphone access. Permission errors stay visible with a recovery instruction. Extension activation reports pending/approval/success/error states. Removal uses a native app-owned confirmation and stops capture first. Camera-off preview is labeled as such. No claim of Teams connectivity before the CMIO sink connects.
 
 Buttons retain native keyboard, hover, pressed, and disabled states. Global Control–Option shortcuts use Carbon registration, not keyboard monitoring. Every shortcut has an on-screen alternative. Normal camera bypasses all effects, and cue buttons are disabled while bypassed.
 
-A Distance slider below the preview controls subject scale with Original/Farther labels, a size percentage, and Reset. It is disabled when the castle cutout is off or normal camera is on. Blood trails and vampire attire have separate switches. A native Hair picker offers Natural, Black + silver temples, Silver-gray, and Deep black with a separate strength slider; Natural disables that slider. Makeup covers the broader head and neck with soft, color-selective masks. The costume is a textured photographic garment overlay with a swept black collar, restrained red piping, and smoothed tracking. Fog amount uses an Off–Thick slider in The grounds; its rising billows fade out two-thirds up the frame. System reduced-motion preference freezes fog and blood trails and disables automatic bats/lightning initially; explicit cue buttons remain intentional user actions. A plain wall and even face lighting are recommended for segmentation quality. Person cutout failure displays the castle rather than leaking the room.
+A Distance slider below the preview controls subject scale with Original/Farther labels, a size percentage, and Reset. It is disabled when the castle cutout is off or normal camera is on. Blood trails and vampire attire have separate switches. A native Hair picker offers Natural, Black + silver temples, Silver-gray, Icy white, and Deep black with a separate strength slider; Natural disables that slider. Icy white at 100% is the requested default, with strand contrast and a tighter forehead guard. Makeup covers the broader head and neck with soft, color-selective masks. The costume is a textured photographic garment overlay with a swept black collar, restrained red piping, and independent torso tracking. Perspective fitting follows shoulders and hips, with a final stabilizer that smooths position separately from shape and suppresses tiny changes. The real torso is removed when attire and the castle cutout are on; only the head, ears, hair, neck and detected hands remain. Hand occlusion lets gestures appear in front. Contacts follow detected pupils, have shaded crimson irises and round dark pupils, and are clipped by the eyelids; surrounding eye shadow is softer. The fit disclosure stays open initially so its adjustments are discoverable. The Scene panel contains Living scene, Scene motion, Depth, Moonlight, Rain, bats, lightning, and Fog amount. Living scene selects the layered perspective environment; its scenery controls are disabled for the classic backdrop. Each scene percentage slider reaches zero to disable its effect. Fog amount controls rising billows that fade out two-thirds up the frame. System reduced-motion preference freezes fog, blood, perspective, mist, and rain and disables automatic bats/lightning initially; explicit cue buttons remain intentional user actions. A plain wall and even face lighting are recommended for segmentation quality. Person cutout failure displays the castle rather than leaking the room.
 
 ## Do's and Don'ts
 

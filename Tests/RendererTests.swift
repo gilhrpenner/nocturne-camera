@@ -8,7 +8,7 @@ struct RendererTests {
         let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         let renderer = try SceneRenderer(assetURL: root.appendingPathComponent("Resources/castle.png"))
         var options = SceneOptions()
-        options.bats = false; options.autoLightning = false; options.fogAmount = 0
+        options.cinematic = false; options.rainAmount = 0; options.bats = false; options.autoLightning = false; options.fogAmount = 0
         let scene = try renderer.render(input: nil, options: options, time: 100)
         precondition(CVPixelBufferGetWidth(scene) == 1280 && CVPixelBufferGetHeight(scene) == 720)
         let dark = bytes(scene)

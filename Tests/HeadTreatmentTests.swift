@@ -40,9 +40,20 @@ import CoreImage
         let tintedCrown = pixel(render(warmCrown, style: .black), 130, 210)
         precondition(abs(Int(tintedCrown[0]) - Int(tintedCrown[2])) < 10, "Warm crown highlights must become neutral, not stay brown")
         precondition(pixel(temples, 86, 183)[0] > pixel(dark, 86, 183)[0] + 10, "Temples must carry silver highlights")
+        let ice = render(hair, style: .white)
+        precondition(pixel(ice, 130, 210)[0] > pixel(silver, 130, 210)[0] + 40, "Icy white must be substantially brighter than silver")
+        precondition(pixel(ice, 130, 210)[0] > 195, "Icy white must lift dark hair into a pale tone")
+        precondition(zip(pixel(ice, 130, 180), pixel(hair, 130, 180)).allSatisfy { abs(Int($0) - Int($1)) <= 2 }, "White hair must not bleach the forehead")
+        let coolSkin = CIImage(color: CIColor(red: 0.65, green: 0.65, blue: 0.65)).cropped(to: bounds)
+        let coolForehead = render(coolSkin, style: .white)
+        precondition(zip(pixel(coolForehead, 130, 180), pixel(coolSkin, 130, 180)).allSatisfy { abs(Int($0) - Int($1)) <= 3 }, "White hair must protect a neutral-colored forehead too")
+        let lightStrands = CIImage(color: CIColor(red: 0.34, green: 0.23, blue: 0.13))
+            .cropped(to: CGRect(x: 80, y: 200, width: 100, height: 30)).composited(over: skin)
+        precondition(pixel(render(lightStrands, style: .white), 130, 210)[0] > pixel(ice, 130, 210)[0] + 12,
+            "White hair must retain visible contrast between lighter and darker strands")
         let foreheadBefore = pixel(hair, 130, 180), foreheadAfter = pixel(dark, 130, 180)
         precondition(zip(foreheadBefore, foreheadAfter).allSatisfy { abs(Int($0) - Int($1)) <= 2 }, "Hair tint must protect the bright warm forehead")
         precondition(pixel(render(hair, style: .silver, amount: 0), 130, 210) == pixel(hair, 130, 210), "Zero hair strength must preserve hair")
-        print("PASS: forehead/cheek/ear/neck coverage, room isolation, hair tones, silver temples, forehead protection, zero-strength bypass")
+        print("PASS: forehead/cheek/ear/neck coverage, room isolation, hair tones, silver temples, icy-white strand contrast, forehead protection, zero-strength bypass")
     }
 }

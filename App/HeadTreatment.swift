@@ -5,6 +5,7 @@ enum HairStyle: String, CaseIterable, Identifiable {
     case natural = "Natural"
     case silverTemples = "Black + silver temples"
     case silver = "Silver-gray"
+    case white = "Icy white"
     case black = "Deep black"
     var id: String { rawValue }
 }
@@ -24,10 +25,11 @@ struct HeadPose {
 final class HeadTreatment {
     private let skinCube: Data
     private let hairCube: Data
+    private let whiteHairCube: Data
     private let cubeSize = 32
 
     init() {
-        var skin = [Float](), hair = [Float]()
+        var skin = [Float](), hair = [Float](), whiteHair = [Float]()
         for b in 0..<cubeSize { for g in 0..<cubeSize { for r in 0..<cubeSize {
             // Core Image evaluates the cube in linear light; classify perceptual colors.
             let red = pow(Double(r) / Double(cubeSize - 1), 1 / 2.2)
@@ -37,11 +39,15 @@ final class HeadTreatment {
             let warm = Self.smooth(-0.025, 0.07, red - blue) * Self.smooth(-0.045, 0.035, red - green)
             let skinWeight = warm * Self.smooth(0.08, 0.32, light)
             let hairWeight = 1 - warm * Self.smooth(0.18, 0.45, light)
+            // For a strong white tint, bright neutral forehead pixels need protection too.
+            let whiteWeight = (1 - Self.smooth(0.4, 0.62, light)) * (1 - warm * Self.smooth(0.18, 0.36, light))
             skin.append(contentsOf: [Float(skinWeight), Float(skinWeight), Float(skinWeight), 1])
             hair.append(contentsOf: [Float(hairWeight), Float(hairWeight), Float(hairWeight), 1])
+            whiteHair.append(contentsOf: [Float(whiteWeight), Float(whiteWeight), Float(whiteWeight), 1])
         } } }
         skinCube = skin.withUnsafeBytes { Data($0) }
         hairCube = hair.withUnsafeBytes { Data($0) }
+        whiteHairCube = whiteHair.withUnsafeBytes { Data($0) }
     }
 
     private static func smooth(_ low: Double, _ high: Double, _ value: Double) -> Double {
@@ -62,6 +68,19 @@ final class HeadTreatment {
         a.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: b])
     }
 
+    func skinSelection(_ image: CIImage) -> CIImage {
+        image.applyingFilter("CIColorCube", parameters: ["inputCubeDimension": cubeSize, "inputCubeData": skinCube])
+    }
+
+    func paleSkin(_ image: CIImage, intensity: Double) -> CIImage {
+        image.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1 - intensity * 0.86,
+            kCIInputBrightnessKey: intensity * 0.07, kCIInputContrastKey: 1 + intensity * 0.09])
+            .applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 1 - intensity * 0.025, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: 1, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: 1 + intensity * 0.025, w: 0)])
+    }
+
     func apply(to image: CIImage, personMask: CIImage, pose: HeadPose, intensity: Double,
         hairStyle: HairStyle, hairAmount: Double, bounds: CGRect) -> CIImage {
         var result = image
@@ -76,24 +95,20 @@ final class HeadTreatment {
                     CGPoint(x: 0.4, y: -1.07), CGPoint(x: -0.4, y: -1.07)])
                 c.closePath(); c.fillPath()
             }
-            let skinColor = image.applyingFilter("CIColorCube", parameters: ["inputCubeDimension": cubeSize, "inputCubeData": skinCube])
+            let skinColor = skinSelection(image)
             let mask = multiply(multiply(skinRegion, skinColor), personMask)
-            let pale = image.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1 - intensity * 0.86,
-                kCIInputBrightnessKey: intensity * 0.07, kCIInputContrastKey: 1 + intensity * 0.09])
-                .applyingFilter("CIColorMatrix", parameters: [
-                    "inputRVector": CIVector(x: 1 - intensity * 0.025, y: 0, z: 0, w: 0),
-                    "inputGVector": CIVector(x: 0, y: 1, z: 0, w: 0),
-                    "inputBVector": CIVector(x: 0, y: 0, z: 1 + intensity * 0.025, w: 0)])
+            let pale = paleSkin(image, intensity: intensity)
             result = pale.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: result, kCIInputMaskImageKey: mask])
         }
         if hairStyle != .natural && hairAmount > 0 {
             let brow = (pose.browY - pose.face.midY) / pose.face.height
             let hairRegion = region(bounds: bounds, pose: pose) { c in
                 // Head geometry limits the color selection; bright warm forehead pixels are protected by hairCube.
-                c.clip(to: CGRect(x: -0.7, y: brow + 0.06, width: 1.4, height: 1.3))
+                c.clip(to: CGRect(x: -0.7, y: brow + (hairStyle == .white ? 0.10 : 0.06), width: 1.4, height: 1.3))
                 c.fillEllipse(in: CGRect(x: -0.6, y: -0.05, width: 1.2, height: 1.2))
             }
-            let hairColor = image.applyingFilter("CIColorCube", parameters: ["inputCubeDimension": cubeSize, "inputCubeData": hairCube])
+            let hairColor = image.applyingFilter("CIColorCube", parameters: ["inputCubeDimension": cubeSize,
+                "inputCubeData": hairStyle == .white ? whiteHairCube : hairCube])
             let crown = region(bounds: bounds, pose: pose) { c in
                 // Above the estimated hairline, retain blond/brown highlights in the treatment too.
                 c.clip(to: CGRect(x: -0.7, y: brow + 0.34, width: 1.4, height: 1.3))
@@ -104,8 +119,8 @@ final class HeadTreatment {
                 .applyingFilter("CIColorMatrix", parameters: ["inputRVector": CIVector(x: hairAmount, y: 0, z: 0, w: 0),
                     "inputGVector": CIVector(x: 0, y: hairAmount, z: 0, w: 0), "inputBVector": CIVector(x: 0, y: 0, z: hairAmount, w: 0)])
             let gray = image.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0])
-            func tone(scale: CGFloat, bias: CGFloat) -> CIImage {
-                gray.applyingFilter("CIColorMatrix", parameters: [
+            func tone(scale: CGFloat, bias: CGFloat, source: CIImage? = nil) -> CIImage {
+                (source ?? gray).applyingFilter("CIColorMatrix", parameters: [
                     "inputRVector": CIVector(x: scale * 0.95, y: 0, z: 0, w: 0),
                     "inputGVector": CIVector(x: 0, y: scale, z: 0, w: 0),
                     "inputBVector": CIVector(x: 0, y: 0, z: scale * 1.06, w: 0),
@@ -113,7 +128,11 @@ final class HeadTreatment {
             }
             let dark = tone(scale: 0.4, bias: 0.015)
             let silver = tone(scale: 0.75, bias: 0.2)
-            var colored = hairStyle == .silver ? silver : dark
+            // Lift dark strands with a curve, keeping their contrast instead of adding a flat white veil.
+            let lifted = gray.applyingFilter("CIGammaAdjust", parameters: ["inputPower": 0.38])
+                .applyingFilter("CIUnsharpMask", parameters: [kCIInputRadiusKey: 1.8, kCIInputIntensityKey: 0.65])
+            let white = tone(scale: 1.55, bias: 0.2, source: lifted)
+            var colored = hairStyle == .white ? white : hairStyle == .silver ? silver : dark
             if hairStyle == .silverTemples {
                 let temples = region(bounds: bounds, pose: pose) { c in
                     for side: CGFloat in [-1, 1] {

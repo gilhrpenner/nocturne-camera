@@ -1,4 +1,22 @@
-# Verification — initial build, 2026-10-26
+# Verification — Nocturne 0.7, 2026-10-26
+
+## Current status
+
+- Eight test suites pass: renderer, fangs, storm/makeup, head/hair treatment, fog, layered scene, tracking stability, and actor/eye appearance.
+- Universal Release build, deep/strict signing checks, and the camera App Group/Mach service contract pass. Host version is 0.7.0 (build 9); the camera extension remains 0.1.1 (build 2).
+- The camera extension is activated, and video delivery through the Teams meeting preview in Safari has been verified. The updated app's native controls and camera-off startup have been checked.
+- The outfit stability regression reduced maximum frame-to-frame jumps from 10 to 0.37 pixels under stationary landmark noise, from 46.34 to 3.66 pixels on hip loss/reacquisition, and from 45.89 to 3.37 pixels on body loss/reacquisition. A sustained lean still moves the garment.
+- Pixel tests verify removal of real shoulders, retention of the head and neck, collar depth, person-mask isolation, pupil alignment, blinking, white-hair strand contrast, and forehead protection under warm and neutral light.
+- Visual replays were inspected locally. Personal reference images, replay outputs, build products, and signed app bundles are excluded from Git.
+- Static UI audit reports zero findings; design lint reports zero errors and the existing advisory about `accent` instead of `primary`.
+
+Long-duration call performance, physical global shortcuts while Teams has focus, and extension removal remain interactive checks. The app is development-signed for local installation; no notarized public binary is provided.
+
+The sections below record earlier findings and their resolution. Statements about pending activation describe the initial build, not the current status.
+
+---
+
+## Initial build, 2026-10-26
 
 ## Passed
 
