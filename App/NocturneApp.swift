@@ -11,9 +11,12 @@ final class CameraModel: ObservableObject {
     @Published var vampire = true { didSet { state.update { $0.vampire = vampire } } }
     @Published var costume = true { didSet { state.update { $0.costume = costume } } }
     @Published var blood = true { didSet { state.update { $0.blood = blood } } }
+    @Published var hairStyle: HairStyle = .silverTemples { didSet { state.update { $0.hairStyle = hairStyle } } }
+    @Published var hairAmount = 0.85 { didSet { state.update { $0.hairAmount = hairAmount } } }
     @Published var castle = true { didSet { state.update { $0.castle = castle } } }
     @Published var bats = true { didSet { state.update { $0.bats = bats } } }
     @Published var lightning = true { didSet { state.update { $0.autoLightning = lightning } } }
+    @Published var fogAmount = 0.55 { didSet { state.update { $0.fogAmount = fogAmount } } }
     @Published var normal = false { didSet { state.update { $0.normal = normal } } }
     @Published var intensity = 0.85 { didSet { state.update { $0.intensity = intensity } } }
     @Published var distance = 0.0 { didSet { state.update { $0.distance = distance } } }
@@ -27,7 +30,7 @@ final class CameraModel: ObservableObject {
         state.update { $0.intensity = 0.85 }
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             bats = false; lightning = false
-            state.update { $0.bats = false; $0.autoLightning = false; $0.animateBlood = false }
+            state.update { $0.bats = false; $0.autoLightning = false; $0.animateBlood = false; $0.animateFog = false }
         }
         pipeline.onFrame = { [weak self] image, status in self?.preview = image; self?.status = status }
         pipeline.onError = { [weak self] message in self?.error = message; self?.running = false; self?.starting = false }
@@ -118,7 +121,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("The vampire").font(.custom("Baskerville", size: 23))
                     Toggle("Theatrical makeup", isOn: $model.vampire).help("Control–Option–V")
-                    Text("Sunken eyes, dark veins, pale skin, and long fangs.").font(.callout).foregroundStyle(Theme.muted)
+                    Text("Pale face, forehead, ears & neck. Sunken eyes and long fangs.").font(.callout).foregroundStyle(Theme.muted)
                     Toggle("Blood trails", isOn: $model.blood).disabled(!model.vampire || model.normal)
                     Toggle("Vampire attire", isOn: $model.costume).disabled(model.normal)
                         .help("A textured black cape, swept collar, brocade waistcoat, and silk cravat.")
@@ -126,11 +129,24 @@ struct ContentView: View {
                         HStack { Text("Intensity"); Spacer(); Text(model.intensity, format: .percent.precision(.fractionLength(0))).monospacedDigit() }
                         Slider(value: $model.intensity, in: 0...1).accessibilityLabel("Vampire intensity")
                     }.disabled(!model.vampire || model.normal)
+                    Picker("Hair", selection: $model.hairStyle) {
+                        ForEach(HairStyle.allCases) { style in Text(style.rawValue).tag(style) }
+                    }.disabled(model.normal)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack { Text("Hair strength"); Spacer(); Text(model.hairAmount, format: .percent.precision(.fractionLength(0))).monospacedDigit() }
+                        Slider(value: $model.hairAmount, in: 0...1).accessibilityLabel("Hair strength")
+                    }.disabled(model.hairStyle == .natural || model.normal)
                     Divider()
                     Text("The grounds").font(.custom("Baskerville", size: 23))
                     Toggle("Castle & person cutout", isOn: $model.castle)
                     Toggle("Flying bats", isOn: $model.bats)
                     Toggle("Restless lightning storm", isOn: $model.lightning)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack { Text("Fog amount"); Spacer(); Text(model.fogAmount, format: .percent.precision(.fractionLength(0))).monospacedDigit() }
+                        Slider(value: $model.fogAmount, in: 0...1).accessibilityLabel("Fog amount")
+                            .help("Rising fog, thickest at the bottom and fading out two-thirds up. Set to zero to turn it off.")
+                        HStack { Text("Off"); Spacer(); Text("Thick") }.font(.caption).foregroundStyle(Theme.muted)
+                    }.disabled(model.normal)
                     Text("Even light on your face helps the cutout. A plain wall is ideal.").font(.caption).foregroundStyle(Theme.muted)
                     Divider()
                     Button("Enable Teams camera", systemImage: "video.badge.checkmark") { camera.activate() }

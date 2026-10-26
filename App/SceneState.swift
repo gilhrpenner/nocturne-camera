@@ -5,9 +5,13 @@ struct SceneOptions {
     var costume = true
     var blood = true
     var animateBlood = true
+    var hairStyle: HairStyle = .silverTemples
+    var hairAmount: Double = 0.85
     var castle = true
     var bats = true
     var autoLightning = true
+    var fogAmount: Double = 0.55
+    var animateFog = true
     var normal = false
     var intensity: Double = 0.85
     var distance: Double = 0

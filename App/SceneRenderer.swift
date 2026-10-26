@@ -7,6 +7,8 @@ final class SceneRenderer {
     let bounds = CGRect(x: 0, y: 0, width: VideoFormat.width, height: VideoFormat.height)
     private let background: CIImage
     private let costumeTexture: CGImage
+    private let headTreatment = HeadTreatment()
+    private let fog = Fog()
     private var previousPose: CostumePose?
     private var pool: CVPixelBufferPool?
     private let segmentation = VNGeneratePersonSegmentationRequest()
@@ -58,15 +60,16 @@ final class SceneRenderer {
             let camera = Self.fill(CIImage(cvPixelBuffer: input), in: bounds)
             if options.normal { previousPose = nil; return try output(camera) }
             var requests: [VNRequest] = []
-            let needsFace = options.vampire || options.costume
-            if options.castle || options.costume { requests.append(segmentation) }
+            let needsHead = options.vampire || options.hairStyle != .natural
+            let needsFace = needsHead || options.costume
+            if options.castle || options.costume || needsHead { requests.append(segmentation) }
             if needsFace { requests.append(faceRequest) } else { face = nil }
             let updateBody = options.costume && frameNumber % 4 == 0
             frameNumber += 1
             if updateBody { requests.append(bodyRequest) }
             if !requests.isEmpty {
                 do {
-                    // Both requests see the exact same cropped, unmirrored image as the compositor.
+                    // All requests see the exact same cropped, unmirrored image as the compositor.
                     try VNImageRequestHandler(ciImage: camera, options: [:]).perform(requests)
                     face = needsFace ? faceRequest.results?.max(by: { $0.boundingBox.width < $1.boundingBox.width }) : nil
                     if updateBody {
@@ -75,7 +78,7 @@ final class SceneRenderer {
                             return CGPoint(x: p.location.x * bounds.width, y: p.location.y * bounds.height)
                         }
                     }
-                    if options.castle || options.costume, let result = segmentation.results?.first {
+                    if options.castle || options.costume || needsHead, let result = segmentation.results?.first {
                         let raw = CIImage(cvPixelBuffer: result.pixelBuffer)
                         mask = raw.transformed(by: CGAffineTransform(scaleX: bounds.width / raw.extent.width,
                             y: bounds.height / raw.extent.height))
@@ -87,7 +90,24 @@ final class SceneRenderer {
                     segmentationFailed = options.castle
                 }
             }
-            subject = options.vampire ? vampireGrade(camera, intensity: options.intensity) : camera
+            subject = camera
+            if needsHead, let face, let mask {
+                let box = face.boundingBox
+                let left = points(face.landmarks?.leftEye, on: face), right = points(face.landmarks?.rightEye, on: face)
+                func center(_ values: [CGPoint]) -> CGPoint? {
+                    guard !values.isEmpty else { return nil }
+                    return CGPoint(x: values.map(\.x).reduce(0, +) / CGFloat(values.count), y: values.map(\.y).reduce(0, +) / CGFloat(values.count))
+                }
+                let eyes = [center(left), center(right)].compactMap { $0 }.sorted { $0.x < $1.x }
+                let brows = points(face.landmarks?.leftEyebrow, on: face) + points(face.landmarks?.rightEyebrow, on: face)
+                let browY = center(brows)?.y ?? (box.minY + box.height * 0.82) * bounds.height
+                let angle = eyes.count == 2 ? atan2(eyes[1].y - eyes[0].y, eyes[1].x - eyes[0].x) : 0
+                let pose = HeadPose(face: CGRect(x: box.minX * bounds.width, y: box.minY * bounds.height,
+                    width: box.width * bounds.width, height: box.height * bounds.height), browY: browY, angle: angle)
+                subject = headTreatment.apply(to: camera, personMask: mask, pose: pose,
+                    intensity: options.vampire ? options.intensity : 0, hairStyle: options.hairStyle,
+                    hairAmount: options.hairAmount, bounds: bounds)
+            }
             if options.castle && mask == nil { segmentationFailed = true }
         } else { face = nil; shoulders = []; previousPose = nil }
 
@@ -139,21 +159,11 @@ final class SceneRenderer {
            (!options.castle || mask != nil) {
             scene = faceOverlay(face, options: options, time: time, transform: placement).composited(over: scene)
         }
+        if !options.normal, options.fogAmount > 0 {
+            scene = fog.image(amount: options.fogAmount, time: time, animated: options.animateFog, bounds: bounds).composited(over: scene)
+        }
         scene = overlay(time: time, options: options, foreground: true).composited(over: scene)
         return try output(scene)
-    }
-
-    private func vampireGrade(_ image: CIImage, intensity: Double) -> CIImage {
-        guard let face else { return image }
-        let r = face.boundingBox
-        let center = CIVector(x: r.midX * bounds.width, y: r.midY * bounds.height)
-        let radius = r.width * bounds.width * 0.55
-        let mask = CIFilter(name: "CIRadialGradient", parameters: ["inputCenter": center,
-            "inputRadius0": radius * 0.5, "inputRadius1": radius,
-            "inputColor0": CIColor.white, "inputColor1": CIColor.clear])!.outputImage!.cropped(to: bounds)
-        let pale = image.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1 - intensity * 0.83,
-            kCIInputBrightnessKey: intensity * 0.08, kCIInputContrastKey: 1 + intensity * 0.14])
-        return pale.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: image, kCIInputMaskImageKey: mask])
     }
 
     private func canvas(transform: CGAffineTransform = .identity, _ draw: (CGContext) -> Void) -> CIImage {

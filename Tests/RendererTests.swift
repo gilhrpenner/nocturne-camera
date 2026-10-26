@@ -8,7 +8,7 @@ struct RendererTests {
         let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         let renderer = try SceneRenderer(assetURL: root.appendingPathComponent("Resources/castle.png"))
         var options = SceneOptions()
-        options.bats = false; options.autoLightning = false
+        options.bats = false; options.autoLightning = false; options.fogAmount = 0
         let scene = try renderer.render(input: nil, options: options, time: 100)
         precondition(CVPixelBufferGetWidth(scene) == 1280 && CVPixelBufferGetHeight(scene) == 720)
         let dark = bytes(scene)
@@ -35,7 +35,7 @@ struct RendererTests {
         precondition(bats != dark, "Bat cue must change the scene")
         options.vanishAt = 105
         precondition(options.isVanished(at: 106) && !options.isVanished(at: 108), "Vanish must expire after 3 seconds")
-        options.normal = true
+        options.normal = true; options.fogAmount = 1
         options.distance = 1
         precondition(options.flash(at: 100) == 0 && !options.isVanished(at: 106), "Normal mode must suppress effects")
         var input: CVPixelBuffer?
@@ -44,7 +44,7 @@ struct RendererTests {
         renderer.context.render(CIImage(color: CIColor(red: 0.7, green: 0.3, blue: 0.1)), to: input!)
         let bypass = bytes(try renderer.render(input: input, options: options, time: 106))
         precondition(bypass == bytes(input!), "Normal camera must preserve input pixels")
-        options.normal = false; options.vampire = false; options.swarmAt = -100
+        options.normal = false; options.fogAmount = 0; options.vampire = false; options.swarmAt = -100
         let noPerson = bytes(try renderer.render(input: input, options: options, time: 110))
         precondition(noPerson != bytes(input!), "Empty-room input must not bypass the cutout")
 

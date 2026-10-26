@@ -69,13 +69,13 @@ Tonal panel separation, native control borders, and no ornamental shadows. All d
 
 ## Components
 
-Canonical owners: controls and confirmation dialogs use SwiftUI; effect cues use `ContentView.cue`; persistent status belongs to `CameraModel` or `ExtensionManager`. No tables, selects, dates, navigation flows, or remote data exist. No comparable sibling screen exists in this new one-window app.
+Canonical owners: controls and confirmation dialogs use SwiftUI; effect cues use `ContentView.cue`; persistent status belongs to `CameraModel` or `ExtensionManager`. No tables, dates, navigation flows, or remote data exist. Hair selection uses a native SwiftUI picker. No comparable sibling screen exists in this new one-window app.
 
 Start camera explicitly requests camera access. No microphone access. Permission errors stay visible with a recovery instruction. Extension activation reports pending/approval/success/error states. Removal uses a native app-owned confirmation and stops capture first. Camera-off preview is labeled as such. No claim of Teams connectivity before the CMIO sink connects.
 
 Buttons retain native keyboard, hover, pressed, and disabled states. Global Control–Option shortcuts use Carbon registration, not keyboard monitoring. Every shortcut has an on-screen alternative. Normal camera bypasses all effects, and cue buttons are disabled while bypassed.
 
-A Distance slider below the preview controls subject scale with Original/Farther labels, a size percentage, and Reset. It is disabled when the castle cutout is off or normal camera is on. Blood trails and vampire attire have separate switches. The costume is a textured photographic garment overlay with a swept black collar, restrained red piping, and smoothed tracking. System reduced-motion preference freezes blood trails and disables automatic bats/lightning initially; explicit cue buttons remain intentional user actions. A plain wall and even face lighting are recommended for segmentation quality. Person cutout failure displays the castle rather than leaking the room.
+A Distance slider below the preview controls subject scale with Original/Farther labels, a size percentage, and Reset. It is disabled when the castle cutout is off or normal camera is on. Blood trails and vampire attire have separate switches. A native Hair picker offers Natural, Black + silver temples, Silver-gray, and Deep black with a separate strength slider; Natural disables that slider. Makeup covers the broader head and neck with soft, color-selective masks. The costume is a textured photographic garment overlay with a swept black collar, restrained red piping, and smoothed tracking. Fog amount uses an Off–Thick slider in The grounds; its rising billows fade out two-thirds up the frame. System reduced-motion preference freezes fog and blood trails and disables automatic bats/lightning initially; explicit cue buttons remain intentional user actions. A plain wall and even face lighting are recommended for segmentation quality. Person cutout failure displays the castle rather than leaking the room.
 
 ## Do's and Don'ts
 
