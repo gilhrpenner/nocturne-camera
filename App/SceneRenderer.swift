@@ -7,6 +7,7 @@ final class SceneRenderer {
     let bounds = CGRect(x: 0, y: 0, width: VideoFormat.width, height: VideoFormat.height)
     private let background: CinematicScene
     private let costumeTexture: CIImage
+    private let heroCostume = HeroCostume()
     private let headTreatment = HeadTreatment()
     private let fog = Fog()
     private let weather = SceneWeather()
@@ -52,11 +53,15 @@ final class SceneRenderer {
     private func resetTracking() {
         face = nil; bodyTracker.reset(); poseAnalyzer.reset(); handHulls = []; handTime = -.infinity
         costumeStabilizer.reset()
+        heroCostume.reset()
         batDissolve.reset()
         trackingStatus = "Camera off"; background.resetView()
     }
 
-    func render(input: CVPixelBuffer?, options: SceneOptions, time: Double) throws -> CVPixelBuffer {
+    func render(input: CVPixelBuffer?, options requestedOptions: SceneOptions, time: Double) throws -> CVPixelBuffer {
+        let options = requestedOptions.renderingOptions(at: time)
+        let character = options.selectedCharacter
+        if character != .batman { heroCostume.reset() }
         var camera: CIImage?
         var subject: CIImage?
         var mask: CIImage?
@@ -143,12 +148,22 @@ final class SceneRenderer {
                 trackingStatus = body.isTracked ? (body.hips.count == 2 ? "Torso tracked" : "Shoulders tracked") : "Show both shoulders for a closer fit"
                 let fit = costumeStabilizer.update(CostumeFit.make(body: body, face: anchor,
                     width: options.costumeWidth, lift: options.costumeLift), at: time)
-                let costume = fit.image(texture: costumeTexture, placement: placement).cropped(to: bounds)
-                let head = ActorMasks.head(jaw: face.map { points($0.landmarks?.faceContour, on: $0) } ?? [],
-                    face: anchor.bounds, bounds: bounds, placement: placement)
-                let neck = ActorMasks.neck(face: anchor, neckline: fit.neck, bounds: bounds, placement: placement)
-                actor = ActorCompositor.dressed(subject: placedSubject, personMask: placedMask, garment: costume,
-                    headMask: head, neckMask: neck, bounds: bounds)
+                let costume = fit.image(texture: character == .batman ? heroCostume.suit : costumeTexture, placement: placement).cropped(to: bounds)
+                if character == .batman {
+                    let eyes = face.map { observation in
+                        [center(points(observation.landmarks?.leftEye, on: observation)),
+                         center(points(observation.landmarks?.rightEye, on: observation))].compactMap { $0 }
+                    } ?? []
+                    let pose = heroCostume.stabilized(CowlPose.make(eyes: eyes, face: anchor), at: time)
+                    actor = heroCostume.dressed(subject: placedSubject, personMask: placedMask, garment: costume,
+                        pose: pose, placement: placement, bounds: bounds)
+                } else {
+                    let head = ActorMasks.head(jaw: face.map { points($0.landmarks?.faceContour, on: $0) } ?? [],
+                        face: anchor.bounds, bounds: bounds, placement: placement)
+                    let neck = ActorMasks.neck(face: anchor, neckline: fit.neck, bounds: bounds, placement: placement)
+                    actor = ActorCompositor.dressed(subject: placedSubject, personMask: placedMask, garment: costume,
+                        headMask: head, neckMask: neck, bounds: bounds)
+                }
                 if !handHulls.isEmpty, let camera {
                     let hand = ActorMasks.hands(hulls: handHulls, arms: [], faceWidth: anchor.bounds.width, bounds: bounds, placement: placement)
                     // Hand landmarks preserve the whole hand. Skin selection prevents sleeves from leaking through the coat.

@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p build
 xcrun swiftc -swift-version 5 -target arm64-apple-macos14.0 \
-  App/BatSprite.swift App/DissolveMesh.swift App/BatDissolve.swift App/BatPainter.swift App/HauntedWindows.swift App/StagePerformance.swift App/ActorCompositor.swift App/CostumeStabilizer.swift App/VampireEyes.swift App/PoseAnalyzer.swift App/ActorMasks.swift App/BodyTracker.swift App/CostumeFit.swift App/SceneCanvas.swift App/CinematicScene.swift App/SceneLighting.swift App/SceneWeather.swift App/SceneState.swift App/HeadTreatment.swift App/Fog.swift App/Storm.swift App/VampireMakeup.swift App/FangGeometry.swift App/FangPainter.swift App/SceneRenderer.swift Shared/VideoFormat.swift Tests/RendererTests.swift \
+  App/HeroArtwork.swift App/HeroCostume.swift App/BatSprite.swift App/DissolveMesh.swift App/BatDissolve.swift App/BatPainter.swift App/HauntedWindows.swift App/StagePerformance.swift App/ActorCompositor.swift App/CostumeStabilizer.swift App/VampireEyes.swift App/PoseAnalyzer.swift App/ActorMasks.swift App/BodyTracker.swift App/CostumeFit.swift App/SceneCanvas.swift App/CinematicScene.swift App/SceneLighting.swift App/SceneWeather.swift App/SceneState.swift App/HeadTreatment.swift App/Fog.swift App/Storm.swift App/VampireMakeup.swift App/FangGeometry.swift App/FangPainter.swift App/SceneRenderer.swift Shared/VideoFormat.swift Tests/RendererTests.swift \
   -o build/RendererTests
 ./build/RendererTests
 bash scripts/test-fangs.sh
@@ -22,3 +22,6 @@ xcrun swiftc -swift-version 5 App/ActorCompositor.swift App/VampireEyes.swift Ap
 
 xcrun swiftc -swift-version 5 App/StagePerformance.swift App/BatSprite.swift App/DissolveMesh.swift App/BatDissolve.swift App/BatPainter.swift App/HauntedWindows.swift App/SceneCanvas.swift App/SceneState.swift App/Storm.swift App/HeadTreatment.swift Tests/PerformanceTests.swift -o build/PerformanceTests
 ./build/PerformanceTests
+
+xcrun swiftc -swift-version 5 App/HeroArtwork.swift App/HeroCostume.swift App/BodyTracker.swift App/SceneCanvas.swift App/SceneState.swift App/StagePerformance.swift App/Storm.swift App/HeadTreatment.swift Tests/CharacterTests.swift -o build/CharacterTests
+./build/CharacterTests

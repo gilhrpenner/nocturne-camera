@@ -1,6 +1,22 @@
 import Foundation
 
+enum SceneCharacter: String, CaseIterable, Identifiable {
+    case vampire = "Vampire"
+    case batman = "Batman"
+    var id: String { rawValue }
+    var other: Self { self == .vampire ? .batman : .vampire }
+}
+
+private struct CharacterTransition {
+    let from: SceneCharacter
+    let to: SceneCharacter
+    let switchAt: TimeInterval
+    func character(at time: TimeInterval) -> SceneCharacter { time < switchAt ? from : to }
+}
+
 struct SceneOptions {
+    private(set) var selectedCharacter: SceneCharacter = .vampire
+    private var characterTransition: CharacterTransition?
     var vampire = true
     var costume = true
     var blood = true
@@ -36,13 +52,50 @@ struct SceneOptions {
         return StagePerformance.active(vanishAt: vanishAt, entranceAt: entranceAt, time: time)
     }
 
-    mutating func cancelPerformance() { vanishAt = -100; entranceAt = -100 }
+    func character(at time: TimeInterval) -> SceneCharacter {
+        characterTransition?.character(at: time) ?? selectedCharacter
+    }
+
+    /// Resolve only for this frame; the user's vampire settings survive a round trip.
+    func renderingOptions(at time: TimeInterval) -> Self {
+        var result = self
+        result.selectedCharacter = character(at: time)
+        result.characterTransition = nil
+        if result.selectedCharacter == .batman {
+            result.vampire = false; result.blood = false; result.hairStyle = .natural; result.costume = true
+        }
+        return result
+    }
+
+    func performanceLabel(at time: TimeInterval) -> String {
+        guard let cue = performance(at: time) else { return "" }
+        if cue.kind == .vanish, let transition = characterTransition {
+            return cue.gathering ? "Returning as \(transition.to.rawValue)…" : "\(cue.label) Next: \(transition.to.rawValue)."
+        }
+        return cue.label
+    }
+
+    mutating func selectCharacter(_ character: SceneCharacter, at time: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        cancelPerformance(at: time)
+        selectedCharacter = character
+    }
+
+    mutating func cancelPerformance(at time: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        selectedCharacter = character(at: time)
+        characterTransition = nil
+        vanishAt = -100; entranceAt = -100
+    }
 
     @discardableResult
     mutating func beginPerformance(_ kind: StagePerformance.Kind, at time: TimeInterval) -> Bool {
         guard !normal, castle, performance(at: time) == nil else { return false }
-        cancelPerformance()
-        if kind == .vanish { vanishAt = time } else { entranceAt = time }
+        cancelPerformance(at: time)
+        if kind == .vanish {
+            vanishAt = time
+            let cue = StagePerformance(kind: kind, startedAt: time, elapsed: 0)
+            characterTransition = CharacterTransition(from: selectedCharacter, to: selectedCharacter.other,
+                switchAt: time + cue.gatheringAt)
+        } else { entranceAt = time }
         return true
     }
 

@@ -117,7 +117,7 @@ final class CameraPipeline: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
                     let status = renderer.segmentationFailed ? "Cutout unavailable — showing castle for privacy" :
                         (publish ? sink.status : "Scene preview · camera off")
                     let tracking = renderer.trackingStatus
-                    let cue = publish ? options.performance(at: time)?.label ?? "" : ""
+                    let cue = publish ? options.performanceLabel(at: time) : ""
                     DispatchQueue.main.async { self.onFrame?(cg, status, tracking, cue) }
                 }
             } catch {

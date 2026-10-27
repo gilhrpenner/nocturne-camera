@@ -44,9 +44,14 @@ struct RendererTests {
         renderer.context.render(CIImage(color: CIColor(red: 0.7, green: 0.3, blue: 0.1)), to: input!)
         let bypass = bytes(try renderer.render(input: input, options: options, time: 106))
         precondition(bypass == bytes(input!), "Normal camera must preserve input pixels")
+        options.selectCharacter(.batman, at: 106)
+        let heroBypass = bytes(try renderer.render(input: input, options: options, time: 106))
+        precondition(heroBypass == bytes(input!),
+            "Normal camera must also bypass the cowl and forced Batman suit")
         options.normal = false; options.fogAmount = 0; options.vampire = false; options.swarmAt = -100
         let noPerson = bytes(try renderer.render(input: input, options: options, time: 110))
         precondition(noPerson != bytes(input!), "Empty-room input must not bypass the cutout")
+        precondition(noPerson == dark, "Batman without a visible face must show only the scene")
 
         let cg = renderer.context.createCGImage(CIImage(cvPixelBuffer: scene), from: renderer.bounds)!
         let rep = NSBitmapImageRep(cgImage: cg)

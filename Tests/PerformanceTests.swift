@@ -108,6 +108,21 @@ import CoreGraphics
         precondition(bytes(dissolve.image(actor: actor, performance: nil, context: context, bounds: bounds)) == original)
         precondition(dissolve.fragments.isEmpty, "Cancel/bypass must release the previous silhouette")
 
+        // A return must capture the new appearance instead of recycling the outgoing face and costume.
+        let blueActor = actor.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 1)])
+        _ = dissolve.image(actor: actor, performance: StagePerformance(kind: .vanish, startedAt: 300, elapsed: 0), context: context, bounds: bounds)
+        _ = dissolve.image(actor: blueActor, performance: StagePerformance(kind: .vanish, startedAt: 300, elapsed: 3), context: context, bounds: bounds)
+        let newPieces = SceneCanvas.image(bounds: bounds) { c in
+            for fragment in dissolve.fragments { if let texture = fragment.texture { c.draw(texture, in: fragment.rect) } }
+        }
+        let newPixels = bytes(newPieces)
+        precondition(newPixels[centerIndex + 2] > 240 && newPixels[centerIndex] < 5,
+            "The gathering bats must carry the incoming character's pixels")
+        dissolve.reset()
+
         options = SceneOptions()
         let visitTime = (0..<2900).map { Double($0) / 10 }.first { HauntedWindows.visit(at: $0) != nil }!
         precondition(HauntedWindows.image(time: visitTime + 2, options: options, bounds: bounds) != nil)

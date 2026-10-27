@@ -6,6 +6,7 @@ final class CameraModel: ObservableObject {
     @Published var preview: CGImage?
     @Published var trackingStatus = "Camera off"
     @Published var performanceStatus = ""
+    @Published private(set) var character: SceneCharacter = .vampire
     @Published var status = "Preparing the castle…"
     @Published var error: String?
     @Published var running = false
@@ -44,7 +45,9 @@ final class CameraModel: ObservableObject {
             state.update { $0.bats = false; $0.autoLightning = false; $0.animateBlood = false; $0.animateFog = false; $0.animateScene = false }
         }
         pipeline.onFrame = { [weak self] image, status, tracking, performance in
-            self?.preview = image; self?.status = status; self?.trackingStatus = tracking; self?.performanceStatus = performance
+            guard let self else { return }
+            self.preview = image; self.status = status; self.trackingStatus = tracking; self.performanceStatus = performance
+            self.character = self.state.read().character(at: ProcessInfo.processInfo.systemUptime)
         }
         pipeline.onError = { [weak self] message in self?.error = message; self?.running = false; self?.starting = false }
         pipeline.onRunning = { [weak self] running in self?.running = running; self?.starting = false }
@@ -56,16 +59,23 @@ final class CameraModel: ObservableObject {
         error = nil
         if running { pipeline.stop(); running = false } else { starting = true; pipeline.start() }
     }
+    func selectCharacter(_ selected: SceneCharacter) {
+        let now = ProcessInfo.processInfo.systemUptime
+        guard state.read().performance(at: now) == nil else { return }
+        state.update { $0.selectCharacter(selected, at: now) }
+        character = selected
+    }
     func trigger(_ id: Int) {
         let now = ProcessInfo.processInfo.systemUptime
         switch id {
         case 0: if !normal { state.update { $0.lightningAt = now } }
         case 1: if !normal { state.update { $0.swarmAt = now } }
-        case 2: vampire.toggle()
+        case 2: if character == .vampire { vampire.toggle() }
         case 3: normal.toggle()
         case 4, 5:
             guard running else { return }
             state.update { $0.beginPerformance(id == 4 ? .vanish : .entrance, at: now) }
+            performanceStatus = state.read().performanceLabel(at: now)
         default: break
         }
     }
@@ -159,17 +169,32 @@ struct ContentView: View {
 
     private var lookControls: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("The vampire").font(.custom("Baskerville", size: 23))
-            Toggle("Theatrical makeup", isOn: $model.vampire).help("Control–Option–V")
-            Toggle("Blood trails", isOn: $model.blood).disabled(!model.vampire || model.normal)
-            amount("Intensity", value: $model.intensity).disabled(!model.vampire || model.normal)
-            Picker("Hair", selection: $model.hairStyle) {
-                ForEach(HairStyle.allCases) { style in Text(style.rawValue).tag(style) }
-            }.disabled(model.normal)
-            amount("Hair strength", value: $model.hairAmount).disabled(model.hairStyle == .natural || model.normal)
+            Text(model.character == .vampire ? "The vampire" : "The dark knight").font(.custom("Baskerville", size: 23))
+            Picker("Character", selection: Binding(get: { model.character }, set: { model.selectCharacter($0) })) {
+                ForEach(SceneCharacter.allCases) { character in Text(character.rawValue).tag(character) }
+            }.pickerStyle(.segmented).disabled(model.normal || !model.performanceStatus.isEmpty)
+                .help("Choose your character directly. Vanish & return alternates between the two.")
+            if model.character == .vampire {
+                Toggle("Theatrical makeup", isOn: $model.vampire).disabled(model.normal).help("Control–Option–V")
+                Toggle("Blood trails", isOn: $model.blood).disabled(!model.vampire || model.normal)
+                amount("Intensity", value: $model.intensity).disabled(!model.vampire || model.normal)
+                Picker("Hair", selection: $model.hairStyle) {
+                    ForEach(HairStyle.allCases) { style in Text(style.rawValue).tag(style) }
+                }.disabled(model.normal)
+                amount("Hair strength", value: $model.hairAmount).disabled(model.hairStyle == .natural || model.normal)
+            } else {
+                Text("A fitted cowl, armored suit and cape. Your eyes and lower face stay live.")
+                    .font(.callout).foregroundStyle(Theme.muted)
+                Text("Vanish again to return to your vampire look.").font(.caption).foregroundStyle(Theme.muted)
+                if !model.castle {
+                    Text("Turn on Castle & person cutout to replace your full silhouette.").font(.caption).foregroundStyle(Theme.muted)
+                }
+            }
             Divider()
-            Toggle("Vampire attire", isOn: $model.costume).disabled(model.normal)
-                .help("Replace your real torso with the costume, keeping your head, neck and detected hands.")
+            if model.character == .vampire {
+                Toggle("Vampire attire", isOn: $model.costume).disabled(model.normal)
+                    .help("Replace your real torso with the costume, keeping your head, neck and detected hands.")
+            }
             Text(model.running ? model.trackingStatus : "Shoulder and torso tracking").font(.caption).foregroundStyle(Theme.muted)
                 .accessibilityLabel("Outfit tracking: \(model.trackingStatus)")
             DisclosureGroup("Adjust the fit", isExpanded: $fitting) {
@@ -185,7 +210,7 @@ struct ContentView: View {
                     HStack { Spacer(); Button("Reset fit") { model.costumeWidth = 1; model.costumeLift = 0 }.buttonStyle(.link)
                         .disabled(model.costumeWidth == 1 && model.costumeLift == 0) }
                 }.padding(.top, 10)
-            }.disabled(!model.costume || model.normal)
+            }.disabled((model.character == .vampire && !model.costume) || model.normal)
             Text("Keep both shoulders visible. Lean or turn gently; the outfit follows your torso.").font(.caption).foregroundStyle(Theme.muted)
         }
     }
@@ -241,7 +266,7 @@ struct ContentView: View {
                 Text(title).font(.callout.weight(.medium))
             }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
         }.buttonStyle(.bordered).disabled(model.normal || (id >= 4 && (!model.running || !model.castle || !model.performanceStatus.isEmpty)))
-            .help(id == 4 ? "Transform into bats, then reform automatically in six seconds. \(keys). Requires camera and castle cutout." :
+            .help(id == 4 ? "Transform into bats and return as \(model.character.other.rawValue) in six seconds. \(keys). Requires camera and castle cutout." :
                 id == 5 ? "Gather a flock into your silhouette with a coordinated lightning reveal. \(keys). Requires camera and castle cutout." :
                 "Trigger \(title) — \(keys)")
     }
@@ -250,7 +275,7 @@ struct ContentView: View {
         if model.normal { return "Normal camera bypasses every effect." }
         if !model.running { return "Start camera for Vanish & return and Grand entrance." }
         if !model.castle { return "Turn on Castle & person cutout for Vanish & return and Grand entrance." }
-        return model.performanceStatus.isEmpty ? model.shortcutStatus : model.performanceStatus
+        return model.performanceStatus.isEmpty ? "Next vanish: return as \(model.character.other.rawValue). \(model.shortcutStatus)" : model.performanceStatus
     }
 }
 

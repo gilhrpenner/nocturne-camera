@@ -10,9 +10,10 @@ struct StagePerformance {
     static let departureDuration = 1.3
     static let flightDuration = 1.25
     var returnAt: Double { kind == .vanish ? 4.25 : 0.55 }
+    var gatheringAt: Double { max(0, returnAt - Self.flightDuration) }
     var returnDuration: Double { 1.75 }
     var duration: Double { returnAt + returnDuration }
-    var gathering: Bool { kind == .entrance || elapsed >= returnAt - Self.flightDuration }
+    var gathering: Bool { kind == .entrance || elapsed >= gatheringAt }
 
     /// 0 is the whole actor; 1 is an empty stage.
     var dissolution: Double {
