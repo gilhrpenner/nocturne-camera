@@ -21,8 +21,25 @@ final class CameraModel: ObservableObject {
     @Published var sceneDepth = 0.65 { didSet { state.update { $0.sceneDepth = sceneDepth } } }
     @Published var rainAmount = 0.18 { didSet { state.update { $0.rainAmount = rainAmount } } }
     @Published var relighting = 0.45 { didSet { state.update { $0.relighting = relighting } } }
-    @Published var costumeWidth = 1.0 { didSet { state.update { $0.costumeWidth = costumeWidth } } }
-    @Published var costumeLift = 0.0 { didSet { state.update { $0.costumeLift = costumeLift } } }
+    @Published private(set) var characterFits = CharacterFits.load() {
+        didSet {
+            state.update { $0.characterFits = characterFits }
+            characterFits.save()
+        }
+    }
+    var outfitAdjustment: OutfitAdjustments { characterFits[character] }
+    var costumeWidth: Double {
+        get { outfitAdjustment.width }
+        set { updateFit(\.width, to: newValue) }
+    }
+    var costumeHeight: Double {
+        get { outfitAdjustment.height }
+        set { updateFit(\.height, to: newValue) }
+    }
+    var costumeLift: Double {
+        get { outfitAdjustment.lift }
+        set { updateFit(\.lift, to: newValue) }
+    }
     @Published var preserveHands = true { didSet { state.update { $0.preserveHands = preserveHands } } }
     @Published var animateScene = true { didSet { state.update { $0.animateScene = animateScene } } }
     @Published var hauntedWindows = true { didSet { state.update { $0.hauntedWindows = hauntedWindows } } }
@@ -39,7 +56,7 @@ final class CameraModel: ObservableObject {
 
     init() {
         pipeline = CameraPipeline(state: state)
-        state.update { $0.intensity = 0.85 }
+        state.update { $0.intensity = 0.85; $0.characterFits = characterFits }
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             bats = false; lightning = false; animateScene = false
             state.update { $0.bats = false; $0.autoLightning = false; $0.animateBlood = false; $0.animateFog = false; $0.animateScene = false }
@@ -64,6 +81,18 @@ final class CameraModel: ObservableObject {
         guard state.read().performance(at: now) == nil else { return }
         state.update { $0.selectCharacter(selected, at: now) }
         character = selected
+    }
+    private func updateFit(_ key: WritableKeyPath<OutfitAdjustments, Double>, to value: Double) {
+        var fits = characterFits
+        var adjustment = fits[character]
+        adjustment[keyPath: key] = value
+        fits[character] = adjustment
+        characterFits = fits
+    }
+    func resetFit() {
+        var fits = characterFits
+        fits.reset(character)
+        characterFits = fits
     }
     func trigger(_ id: Int) {
         let now = ProcessInfo.processInfo.systemUptime
@@ -197,20 +226,27 @@ struct ContentView: View {
             }
             Text(model.running ? model.trackingStatus : "Shoulder and torso tracking").font(.caption).foregroundStyle(Theme.muted)
                 .accessibilityLabel("Outfit tracking: \(model.trackingStatus)")
-            DisclosureGroup("Adjust the fit", isExpanded: $fitting) {
+            DisclosureGroup("\(model.character.rawValue) fit", isExpanded: $fitting) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text("Width"); Spacer()
                         Text(model.costumeWidth, format: .percent.precision(.fractionLength(0))).monospacedDigit()
                     }
-                    Slider(value: $model.costumeWidth, in: 0.8...1.2).accessibilityLabel("Outfit width")
+                    Slider(value: $model.costumeWidth, in: OutfitAdjustments.sizeRange).accessibilityLabel("Outfit width")
+                    HStack {
+                        Text("Height"); Spacer()
+                        Text(model.costumeHeight, format: .percent.precision(.fractionLength(0))).monospacedDigit()
+                    }
+                    Slider(value: $model.costumeHeight, in: OutfitAdjustments.sizeRange).accessibilityLabel("Outfit height")
+                        .help("Stretch or shorten this outfit while keeping its neckline in place.")
                     HStack { Text("Collar height"); Spacer(); Text(model.costumeLift == 0 ? "Auto" : model.costumeLift > 0 ? "Higher" : "Lower").foregroundStyle(Theme.muted) }
-                    Slider(value: $model.costumeLift, in: -0.3...0.3).accessibilityLabel("Collar height")
+                    Slider(value: $model.costumeLift, in: OutfitAdjustments.liftRange).accessibilityLabel("Collar height")
                     Toggle("Hands in front", isOn: $model.preserveHands)
-                    HStack { Spacer(); Button("Reset fit") { model.costumeWidth = 1; model.costumeLift = 0 }.buttonStyle(.link)
-                        .disabled(model.costumeWidth == 1 && model.costumeLift == 0) }
+                    HStack { Spacer(); Button("Reset \(model.character.rawValue) fit") { model.resetFit() }.buttonStyle(.link)
+                        .disabled(model.outfitAdjustment == OutfitAdjustments()) }
+                    Text("Saved separately for each character.").font(.caption).foregroundStyle(Theme.muted)
                 }.padding(.top, 10)
-            }.disabled((model.character == .vampire && !model.costume) || model.normal)
+            }.disabled((model.character == .vampire && !model.costume) || model.normal || !model.performanceStatus.isEmpty)
             Text("Keep both shoulders visible. Lean or turn gently; the outfit follows your torso.").font(.caption).foregroundStyle(Theme.muted)
         }
     }

@@ -21,7 +21,7 @@ def write_plist(path, data):
 base_info = dict(CFBundleDevelopmentRegion='en', CFBundleVersion='2', CFBundleShortVersionString='0.1.1',
                  CFBundleIdentifier='$(PRODUCT_BUNDLE_IDENTIFIER)', CFBundleExecutable='$(EXECUTABLE_NAME)',
                  CFBundleName='$(PRODUCT_NAME)')
-write_plist('App/Info.plist', dict(base_info, CFBundleVersion='11', CFBundleShortVersionString='0.9.0', CFBundlePackageType='APPL', LSMinimumSystemVersion='14.0',
+write_plist('App/Info.plist', dict(base_info, CFBundleVersion='12', CFBundleShortVersionString='0.9.1', CFBundlePackageType='APPL', LSMinimumSystemVersion='14.0',
     NSCameraUsageDescription='Nocturne uses your camera to create your live vampire scene. Video stays on your Mac.',
     NSSystemExtensionUsageDescription='Nocturne Camera lets Teams and other video apps receive your Halloween scene.',
     NSPrincipalClass='NSApplication', NSHighResolutionCapable=True))

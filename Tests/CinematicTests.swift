@@ -19,6 +19,22 @@ import CoreGraphics
         precondition(fit.bottomLeft.x < fit.bottomRight.x && fit.topLeft.y > fit.bottomLeft.y, "Hip fitting must not invert the garment")
         let wide = CostumeFit.make(body: body, face: face, width: 1.2, lift: 0)
         precondition(distance(wide.topLeft, wide.topRight) > distance(fit.topLeft, fit.topRight) * 1.19)
+        func garmentHeight(_ fit: CostumeFit) -> CGFloat {
+            distance(midpoint(fit.topLeft, fit.topRight), midpoint(fit.bottomLeft, fit.bottomRight))
+        }
+        precondition(abs(garmentHeight(wide) - garmentHeight(fit)) < 0.001 && wide.neck == fit.neck,
+            "Width must not change outfit height or collar position")
+        let tall = CostumeFit.make(body: body, face: face, width: 1, height: 1.3, lift: 0)
+        precondition(abs(garmentHeight(tall) / garmentHeight(fit) - 1.3) < 0.001 && tall.neck == fit.neck,
+            "Height must stretch around the existing neckline")
+        precondition(abs(distance(tall.topLeft, tall.topRight) - distance(fit.topLeft, fit.topRight)) < 0.001,
+            "Height must not change outfit width")
+        let fallbackBody = TrackedBody(shoulders: body.shoulders, hips: [], arms: [], isTracked: false)
+        let fallbackFit = CostumeFit.make(body: fallbackBody, face: face, width: 1, height: 1, lift: 0)
+        let fallbackSized = CostumeFit.make(body: fallbackBody, face: face, width: 0.7, height: 1.4, lift: 0)
+        precondition(abs(garmentHeight(fallbackSized) / garmentHeight(fallbackFit) - 1.4) < 0.001,
+            "Independent height must also work when hips are outside the frame")
+        precondition(abs(distance(fallbackSized.topLeft, fallbackSized.topRight) / distance(fallbackFit.topLeft, fallbackFit.topRight) - 0.7) < 0.001)
         let raised = CostumeFit.make(body: body, face: face, width: 1, lift: 0.2)
         precondition(raised.neck.y > fit.neck.y + 20, "Collar adjustment must raise the neckline")
         var moving = measurement
@@ -34,10 +50,10 @@ import CoreGraphics
         precondition(!tracker.resolve(face: face, at: 1.6).isTracked)
 
         let bounds = CGRect(x: 0, y: 0, width: 1280, height: 720)
-        let midpoint = CGPoint(x: bounds.midX, y: bounds.midY)
+        let sceneMidpoint = CGPoint(x: bounds.midX, y: bounds.midY)
         let view = SceneViewpoint(x: 0.4, y: 0.2)
-        let near = distance(view.corner(midpoint, depth: 1000, bounds: bounds), midpoint)
-        let far = distance(view.corner(midpoint, depth: 6500, bounds: bounds), midpoint)
+        let near = distance(view.corner(sceneMidpoint, depth: 1000, bounds: bounds), sceneMidpoint)
+        let far = distance(view.corner(sceneMidpoint, depth: 6500, bounds: bounds), sceneMidpoint)
         precondition(near > far * 2, "Nearby stonework must move more than the valley")
         for x in [-0.45, 0.45] { for y in [-0.3, 0.3] {
             let v = SceneViewpoint(x: x, y: y)

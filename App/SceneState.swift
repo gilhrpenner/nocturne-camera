@@ -30,8 +30,7 @@ struct SceneOptions {
     var hauntedWindows = true
     var rainAmount: Double = 0.18
     var relighting: Double = 0.45
-    var costumeWidth: Double = 1
-    var costumeLift: Double = 0
+    var characterFits = CharacterFits()
     var preserveHands = true
     var bats = true
     var autoLightning = true

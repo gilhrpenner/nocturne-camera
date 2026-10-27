@@ -1,5 +1,6 @@
 import CoreGraphics
 import CoreImage
+import Foundation
 
 @main struct CharacterTests {
     static func main() throws {
@@ -9,6 +10,10 @@ import CoreImage
         options.intensity = 0.62
         options.blood = false
         options.costume = false
+        let vampireFit = OutfitAdjustments(width: 1.22, height: 0.86, lift: 0.15)
+        let batmanFit = OutfitAdjustments(width: 0.76, height: 1.28, lift: -0.1)
+        options.characterFits[.vampire] = vampireFit
+        options.characterFits[.batman] = batmanFit
         for cycle in 0..<6 {
             let time = 100 + Double(cycle) * 10
             let from: SceneCharacter = cycle % 2 == 0 ? .vampire : .batman
@@ -24,6 +29,11 @@ import CoreImage
                 options.character(at: time + 6.1) == from.other, "The returned character must persist after the cue")
             precondition(options.performanceLabel(at: time + 4).contains(from.other.rawValue))
             let render = options.renderingOptions(at: time + 6.1)
+            precondition(render.characterFits[render.selectedCharacter] == (from.other == .batman ? batmanFit : vampireFit),
+                "Every return must restore that character's own width, height and collar position")
+            let gathering = options.renderingOptions(at: time + 3)
+            precondition(gathering.characterFits[gathering.selectedCharacter] == (from.other == .batman ? batmanFit : vampireFit),
+                "Incoming bat fragments must start with the incoming character's calibration")
             if from.other == .batman {
                 precondition(!render.vampire && !render.blood && render.hairStyle == .natural && render.costume)
             } else {
@@ -33,6 +43,7 @@ import CoreImage
             }
         }
         options.selectCharacter(.vampire, at: 200)
+        precondition(options.characterFits[options.character(at: 200)] == vampireFit)
         precondition(options.beginPerformance(.vanish, at: 201))
         options.cancelPerformance(at: 202)
         precondition(
@@ -46,6 +57,22 @@ import CoreImage
         options.selectCharacter(.vampire, at: 226)
         options.normal = true
         precondition(!options.beginPerformance(.vanish, at: 227) && options.character(at: 230) == .vampire)
+
+        let suiteName = "NocturneCharacterFitsTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        precondition(CharacterFits.load(from: defaults) == CharacterFits())
+        options.characterFits.save(to: defaults)
+        var reloaded = CharacterFits.load(from: defaults)
+        precondition(reloaded[.vampire] == vampireFit && reloaded[.batman] == batmanFit,
+            "Both calibrations must survive a preference save and fresh load")
+        reloaded.reset(.batman)
+        precondition(reloaded[.batman] == OutfitAdjustments() && reloaded[.vampire] == vampireFit,
+            "Reset must affect only the selected character")
+        reloaded[.batman] = OutfitAdjustments(width: 20, height: -1, lift: .infinity)
+        precondition(reloaded[.batman] == OutfitAdjustments(width: 1.4, height: 0.6, lift: 0))
+        defaults.set(Data("invalid".utf8), forKey: CharacterFits.preferencesKey)
+        precondition(CharacterFits.load(from: defaults) == CharacterFits(), "Unreadable saved fits must recover to defaults")
 
         let pose = CowlPose(
             leftEye: CGPoint(x: 121, y: 290), rightEye: CGPoint(x: 237, y: 310), chin: CGPoint(x: 202, y: 167))
@@ -100,7 +127,7 @@ import CoreImage
         hero.reset()
         precondition(hero.stabilized(shifted, at: 101).leftEye == shifted.leftEye)
         print(
-            "PASS: six alternating transformations, hidden appearance switch, persistent return, preserved vampire preferences, cancel/entrance semantics, cowl landmark registration, real face openings and camera privacy"
+            "PASS: repeated character swaps, independent saved fits and scoped reset, hidden switch, preserved vampire preferences, cancel/entrance semantics, cowl registration, live face openings and camera privacy"
         )
     }
 }

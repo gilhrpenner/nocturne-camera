@@ -10,15 +10,14 @@ struct CostumeFit {
     let shoulderSpan: CGFloat
     let tracked: Bool
 
-    static func make(body: TrackedBody, face: FaceAnchor, width: Double, lift: Double) -> CostumeFit {
+    static func make(body: TrackedBody, face: FaceAnchor, width: Double, height: Double = 1, lift: Double) -> CostumeFit {
         let a = body.shoulders[0], b = body.shoulders[1]
         let span = max(50, distance(a, b))
         let across = CGPoint(x: (b.x - a.x) / span, y: (b.y - a.y) / span)
         var up = CGPoint(x: -across.y, y: across.x)
         let shoulder = midpoint(a, b)
-        let imageWidth = span / 0.70 * CGFloat(width)
+        let imageWidth = span / 0.70
         var imageHeight = imageWidth
-        var bottomCenter = CGPoint(x: shoulder.x - up.x * imageHeight * 0.7, y: shoulder.y - up.y * imageHeight * 0.7)
         var bottomWidth = imageWidth
         if body.hips.count == 2 {
             let hip = midpoint(body.hips[0], body.hips[1]), length = distance(shoulder, hip)
@@ -27,19 +26,20 @@ struct CostumeFit {
                hipSpan > span * 0.35 && hipSpan < span * 1.4 {
                 up = CGPoint(x: (shoulder.x - hip.x) / length, y: (shoulder.y - hip.y) / length)
                 imageHeight = min(imageWidth * 1.3, max(imageWidth * 0.8, length / 0.58))
-                bottomCenter = CGPoint(x: shoulder.x - up.x * imageHeight * 0.7, y: shoulder.y - up.y * imageHeight * 0.7)
-                bottomWidth = min(imageWidth * 1.1, max(imageWidth * 0.78, hipSpan / 0.62 * CGFloat(width)))
+                bottomWidth = min(imageWidth * 1.1, max(imageWidth * 0.78, hipSpan / 0.62))
             }
         }
         let shift = CGFloat(lift) * face.bounds.height
-        let topCenter = CGPoint(x: shoulder.x + up.x * (imageHeight * 0.3 + shift), y: shoulder.y + up.y * (imageHeight * 0.3 + shift))
-        bottomCenter.x += up.x * shift; bottomCenter.y += up.y * shift
+        let neck = CGPoint(x: shoulder.x + up.x * (imageHeight * 0.095 + shift), y: shoulder.y + up.y * (imageHeight * 0.095 + shift))
+        // Resize around the neckline, so width and height never move the attachment to the head.
+        let adjustedHeight = imageHeight * CGFloat(height)
+        let topCenter = CGPoint(x: neck.x + up.x * adjustedHeight * 0.205, y: neck.y + up.y * adjustedHeight * 0.205)
+        let bottomCenter = CGPoint(x: neck.x - up.x * adjustedHeight * 0.795, y: neck.y - up.y * adjustedHeight * 0.795)
         func edge(_ center: CGPoint, _ half: CGFloat) -> CGPoint {
             CGPoint(x: center.x + across.x * half, y: center.y + across.y * half)
         }
-        let neck = CGPoint(x: shoulder.x + up.x * (imageHeight * 0.095 + shift), y: shoulder.y + up.y * (imageHeight * 0.095 + shift))
-        return CostumeFit(topLeft: edge(topCenter, -imageWidth / 2), topRight: edge(topCenter, imageWidth / 2),
-            bottomLeft: edge(bottomCenter, -bottomWidth / 2), bottomRight: edge(bottomCenter, bottomWidth / 2),
+        return CostumeFit(topLeft: edge(topCenter, -imageWidth * width / 2), topRight: edge(topCenter, imageWidth * width / 2),
+            bottomLeft: edge(bottomCenter, -bottomWidth * width / 2), bottomRight: edge(bottomCenter, bottomWidth * width / 2),
             neck: neck, shoulderSpan: span, tracked: body.isTracked)
     }
 

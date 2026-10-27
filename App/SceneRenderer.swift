@@ -14,6 +14,8 @@ final class SceneRenderer {
     private let batDissolve: BatDissolve
     private let bodyTracker = BodyTracker()
     private let costumeStabilizer = CostumeStabilizer()
+    private var fittedCharacter: SceneCharacter?
+    private var appliedAdjustment: OutfitAdjustments?
     private var pool: CVPixelBufferPool?
     private let segmentation = VNGeneratePersonSegmentationRequest()
     private let faceRequest = VNDetectFaceLandmarksRequest()
@@ -53,6 +55,8 @@ final class SceneRenderer {
     private func resetTracking() {
         face = nil; bodyTracker.reset(); poseAnalyzer.reset(); handHulls = []; handTime = -.infinity
         costumeStabilizer.reset()
+        fittedCharacter = nil
+        appliedAdjustment = nil
         heroCostume.reset()
         batDissolve.reset()
         trackingStatus = "Camera off"; background.resetView()
@@ -61,6 +65,12 @@ final class SceneRenderer {
     func render(input: CVPixelBuffer?, options requestedOptions: SceneOptions, time: Double) throws -> CVPixelBuffer {
         let options = requestedOptions.renderingOptions(at: time)
         let character = options.selectedCharacter
+        let adjustment = options.characterFits[character]
+        if fittedCharacter != character || appliedAdjustment != adjustment {
+            costumeStabilizer.reset()
+            fittedCharacter = character
+            appliedAdjustment = adjustment
+        }
         if character != .batman { heroCostume.reset() }
         var camera: CIImage?
         var subject: CIImage?
@@ -147,7 +157,7 @@ final class SceneRenderer {
                 let body = bodyTracker.resolve(face: anchor, at: time)
                 trackingStatus = body.isTracked ? (body.hips.count == 2 ? "Torso tracked" : "Shoulders tracked") : "Show both shoulders for a closer fit"
                 let fit = costumeStabilizer.update(CostumeFit.make(body: body, face: anchor,
-                    width: options.costumeWidth, lift: options.costumeLift), at: time)
+                    width: adjustment.width, height: adjustment.height, lift: adjustment.lift), at: time)
                 let costume = fit.image(texture: character == .batman ? heroCostume.suit : costumeTexture, placement: placement).cropped(to: bounds)
                 if character == .batman {
                     let eyes = face.map { observation in
